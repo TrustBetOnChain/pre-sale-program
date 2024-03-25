@@ -97,6 +97,20 @@ describe("pre-sale-program", () => {
     );
   }
 
+  function calculateConfigSize(mintsLength: number) {
+    const PUB_KEY_SIZE = 32;
+    const BOOL_SIZE = 1;
+    const DISCRIMINATOR_SIZE = 8;
+    const VECTOR_SIZE = 4;
+    const PRICE_SIZE = 8;
+
+    const MINT_SIZE = PRICE_SIZE + PUB_KEY_SIZE;
+    const BASE_CONFIG_SIZE =
+      DISCRIMINATOR_SIZE + PUB_KEY_SIZE + PUB_KEY_SIZE + BOOL_SIZE;
+
+    return BASE_CONFIG_SIZE + VECTOR_SIZE + MINT_SIZE * mintsLength;
+  }
+
   before(async () => {
     await airdrop(signerKeypair.publicKey, 5);
     await airdrop(randomKeypair.publicKey, 5);
@@ -148,7 +162,8 @@ describe("pre-sale-program", () => {
         .updateProgramConfig({
           hasPresaleEnded: true,
           admin: randomKeypair.publicKey,
-          mints: [],
+          prices: [],
+          collectedFundsAccount: randomKeypair.publicKey,
         })
         .accounts({
           programConfig: programConfigAddress,
@@ -169,7 +184,8 @@ describe("pre-sale-program", () => {
       .updateProgramConfig({
         hasPresaleEnded: true,
         admin: null,
-        mints: null,
+        prices: null,
+        collectedFundsAccount: null,
       })
       .accounts({
         programConfig: programConfigAddress,
@@ -201,7 +217,8 @@ describe("pre-sale-program", () => {
       .updateProgramConfig({
         hasPresaleEnded: null,
         admin: randomKeypair.publicKey,
-        mints: null,
+        prices: null,
+        collectedFundsAccount: null,
       })
       .accounts({
         programConfig: programConfigAddress,
@@ -229,18 +246,19 @@ describe("pre-sale-program", () => {
       programConfigAddress
     );
 
-    const mint = {
+    const mintPrice = {
       pubkey: randomKeypair.publicKey,
       price: new anchor.BN(1_000_000_000),
     };
 
-    const mints = [mint];
+    const prices = [mintPrice];
 
     await program.methods
       .updateProgramConfig({
         hasPresaleEnded: null,
         admin: null,
-        mints,
+        prices,
+        collectedFundsAccount: null,
       })
       .accounts({
         admin: randomKeypair.publicKey,
@@ -262,8 +280,120 @@ describe("pre-sale-program", () => {
     expect(JSON.stringify(programConfig.prices)).to.not.equal(
       JSON.stringify(updatedProgramConfig.prices)
     );
-    expect(JSON.stringify(mints)).to.equal(
+    expect(JSON.stringify(prices)).to.equal(
       JSON.stringify(updatedProgramConfig.prices)
+    );
+  });
+
+  it("should only update collectedFundsAccount value", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    expect(programConfig.collectedFundsAccount.toString()).to.equal(
+      collectedFundsKeypair.publicKey.toString()
+    );
+
+    await program.methods
+      .updateProgramConfig({
+        hasPresaleEnded: null,
+        admin: null,
+        prices: null,
+        collectedFundsAccount: randomKeypair.publicKey,
+      })
+      .accounts({
+        admin: randomKeypair.publicKey,
+        programConfig: programConfigAddress,
+      })
+      .signers([randomKeypair])
+      .rpc();
+
+    const updatedProgramConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    expect(programConfig.admin.toString()).to.equal(
+      updatedProgramConfig.admin.toString()
+    );
+
+    expect(JSON.stringify(programConfig.prices)).to.equal(
+      JSON.stringify(updatedProgramConfig.prices)
+    );
+    expect(programConfig.hasPresaleEnded).to.equal(
+      updatedProgramConfig.hasPresaleEnded
+    );
+    expect(updatedProgramConfig.collectedFundsAccount.toString()).to.equal(
+      randomKeypair.publicKey.toString()
+    );
+  });
+
+  it("should allocate and reallocate right size", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    async function fetchConfigSize(account: any) {
+      return (await program.coder.accounts.encode("ProgramConfig", account))
+        .length;
+    }
+
+    expect(await fetchConfigSize(programConfig)).to.equal(
+      calculateConfigSize(programConfig.prices.length)
+    );
+
+    const mintPrice = {
+      pubkey: randomKeypair.publicKey,
+      price: new anchor.BN(1_000_000_000),
+    };
+
+    const prices = [mintPrice, mintPrice, mintPrice, mintPrice, mintPrice];
+
+    await program.methods
+      .updateProgramConfig({
+        hasPresaleEnded: null,
+        admin: null,
+        prices,
+        collectedFundsAccount: null,
+      })
+      .accounts({
+        admin: randomKeypair.publicKey,
+        programConfig: programConfigAddress,
+      })
+      .signers([randomKeypair])
+      .rpc();
+
+    const updatedProgramConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    expect(await fetchConfigSize(updatedProgramConfig)).to.equal(
+      calculateConfigSize(prices.length)
+    );
+
+    // Passing null for prices to check that there was no realloc at all and all the old data stood the same
+    await program.methods
+      .updateProgramConfig({
+        hasPresaleEnded: null,
+        admin: null,
+        prices: null,
+        collectedFundsAccount: null,
+      })
+      .accounts({
+        admin: randomKeypair.publicKey,
+        programConfig: programConfigAddress,
+      })
+      .signers([randomKeypair])
+      .rpc();
+
+    const updatedProgramConfigAfterNullPrices =
+      await program.account.programConfig.fetch(programConfigAddress);
+
+    expect(JSON.stringify(updatedProgramConfigAfterNullPrices.prices)).to.equal(
+      JSON.stringify(prices)
+    );
+
+    expect(await fetchConfigSize(updatedProgramConfigAfterNullPrices)).to.equal(
+      calculateConfigSize(prices.length)
     );
   });
 });

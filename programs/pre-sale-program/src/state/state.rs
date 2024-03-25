@@ -3,9 +3,9 @@ use anchor_lang::prelude::*;
 #[account]
 pub struct ProgramConfig {
     pub admin: Pubkey,
-    pub prices: Vec<MintPrice>,
     pub collected_funds_account: Pubkey,
     pub has_presale_ended: bool,
+    pub prices: Vec<MintPrice>,
 }
 
 impl ProgramConfig {
