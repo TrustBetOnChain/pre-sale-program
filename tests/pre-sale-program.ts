@@ -1,6 +1,11 @@
 import * as anchor from "@coral-xyz/anchor";
 import { PreSaleProgram } from "../target/types/pre_sale_program";
-import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  TransactionConfirmationStrategy,
+} from "@solana/web3.js";
 import { createMint } from "@solana/spl-token";
 import chai from "chai";
 import chaiAsPromised from "chai-as-promised";
@@ -25,6 +30,24 @@ const randomKeypair = Keypair.fromSecretKey(
   ])
 );
 
+const collectedFundsKeypair = Keypair.fromSecretKey(
+  new Uint8Array([
+    37, 61, 63, 175, 49, 172, 51, 143, 11, 255, 215, 213, 78, 97, 122, 154, 219,
+    12, 122, 26, 236, 208, 135, 93, 87, 247, 26, 180, 67, 21, 234, 98, 23, 141,
+    199, 162, 76, 135, 179, 115, 60, 119, 4, 175, 185, 133, 248, 208, 133, 140,
+    70, 37, 228, 217, 104, 184, 208, 153, 95, 25, 190, 189, 156, 197,
+  ])
+);
+
+const mintKeypair = Keypair.fromSecretKey(
+  new Uint8Array([
+    137, 62, 102, 159, 168, 233, 183, 162, 87, 139, 44, 153, 233, 248, 195, 133,
+    223, 23, 167, 185, 221, 162, 249, 145, 129, 116, 98, 118, 235, 219, 103,
+    220, 235, 59, 26, 230, 22, 35, 33, 218, 102, 229, 133, 7, 91, 179, 161, 197,
+    207, 46, 174, 143, 64, 23, 120, 45, 86, 59, 181, 198, 0, 220, 25, 99,
+  ])
+);
+
 describe("pre-sale-program", () => {
   const connection = new Connection("http://localhost:8899", "confirmed");
   const provider = new anchor.AnchorProvider(
@@ -40,38 +63,62 @@ describe("pre-sale-program", () => {
     .PreSaleProgram as anchor.Program<PreSaleProgram>;
 
   const [programConfigAddress] = PublicKey.findProgramAddressSync(
-    [Buffer.from("program_config")],
+    [Buffer.from("config")],
     program.programId
   );
 
-  async function airdrop(pubkey: PublicKey) {
+  const [tokenVaultAddress] = PublicKey.findProgramAddressSync(
+    [Buffer.from("token_vault")],
+    program.programId
+  );
+
+  async function airdrop(pubkey: PublicKey, amount: number) {
     const airdropSignature = await connection.requestAirdrop(
       pubkey,
-      5 * anchor.web3.LAMPORTS_PER_SOL
+      amount * anchor.web3.LAMPORTS_PER_SOL
     );
 
-    await connection.confirmTransaction(airdropSignature);
+    await connection.confirmTransaction(
+      {
+        signature: airdropSignature,
+      } as TransactionConfirmationStrategy,
+      "confirmed"
+    );
+  }
+
+  async function createSplToken() {
+    await createMint(
+      connection,
+      signerKeypair,
+      signerKeypair.publicKey,
+      signerKeypair.publicKey,
+      DECIMALS,
+      mintKeypair
+    );
   }
 
   before(async () => {
-    await airdrop(signerKeypair.publicKey);
-    await airdrop(randomKeypair.publicKey);
+    await airdrop(signerKeypair.publicKey, 5);
+    await airdrop(randomKeypair.publicKey, 5);
+    await airdrop(collectedFundsKeypair.publicKey, 5);
+    await createSplToken();
   });
 
   it("should be initialized!", async () => {
     await program.methods
       .initializeProgramConfig()
       .accounts({
-        authority: signerKeypair.publicKey,
+        signer: signerKeypair.publicKey,
         programConfig: programConfigAddress,
+        tokenVaultAccount: tokenVaultAddress,
+        mint: mintKeypair.publicKey,
+        collectedFundsAccount: collectedFundsKeypair.publicKey,
       })
       .signers([signerKeypair])
       .rpc();
-
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
-
     expect(programConfig.admin.toString()).to.equal(
       signerKeypair.publicKey.toString()
     );
@@ -82,12 +129,17 @@ describe("pre-sale-program", () => {
       program.methods
         .initializeProgramConfig()
         .accounts({
-          authority: signerKeypair.publicKey,
+          signer: signerKeypair.publicKey,
           programConfig: programConfigAddress,
+          tokenVaultAccount: tokenVaultAddress,
+          mint: mintKeypair.publicKey,
+          collectedFundsAccount: collectedFundsKeypair.publicKey,
         })
         .signers([signerKeypair])
         .rpc()
-    ).to.be.rejectedWith();
+    ).to.be.rejectedWith(
+      "failed to send transaction: Transaction simulation failed: Error processing Instruction 0: custom program error: 0x0"
+    );
   });
 
   it("should throw an error if not admin tries to update config", async () => {
@@ -132,8 +184,8 @@ describe("pre-sale-program", () => {
     expect(programConfig.admin.toString()).to.equal(
       updatedProgramConfig.admin.toString()
     );
-    expect(JSON.stringify(programConfig.mints)).to.equal(
-      JSON.stringify(updatedProgramConfig.mints)
+    expect(JSON.stringify(programConfig.prices)).to.equal(
+      JSON.stringify(updatedProgramConfig.prices)
     );
     expect(programConfig.hasPresaleEnded).to.not.equal(
       updatedProgramConfig.hasPresaleEnded
@@ -164,8 +216,8 @@ describe("pre-sale-program", () => {
     expect(programConfig.admin.toString()).to.not.equal(
       updatedProgramConfig.admin.toString()
     );
-    expect(JSON.stringify(programConfig.mints)).to.equal(
-      JSON.stringify(updatedProgramConfig.mints)
+    expect(JSON.stringify(programConfig.prices)).to.equal(
+      JSON.stringify(updatedProgramConfig.prices)
     );
     expect(programConfig.hasPresaleEnded).to.equal(
       updatedProgramConfig.hasPresaleEnded
@@ -207,11 +259,11 @@ describe("pre-sale-program", () => {
     expect(programConfig.hasPresaleEnded).to.equal(
       updatedProgramConfig.hasPresaleEnded
     );
-    expect(JSON.stringify(programConfig.mints)).to.not.equal(
-      JSON.stringify(updatedProgramConfig.mints)
+    expect(JSON.stringify(programConfig.prices)).to.not.equal(
+      JSON.stringify(updatedProgramConfig.prices)
     );
     expect(JSON.stringify(mints)).to.equal(
-      JSON.stringify(updatedProgramConfig.mints)
+      JSON.stringify(updatedProgramConfig.prices)
     );
   });
 });

@@ -8,7 +8,8 @@ mod state;
 declare_id!("5Y8A7Z6G98zukZcUfWcFfGz29Eh3N8bPPuKXbXuH5534");
 
 pub mod constants {
-    pub const SEED_PROGRAM_CONFIG: &[u8] = b"program_config";
+    pub const CONFIG_SEED: &[u8] = b"config";
+    pub const TOKEN_VAULT_SEED: &[u8] = b"token_vault";
 }
 
 #[program]
@@ -25,4 +26,8 @@ pub mod pre_sale_program {
     ) -> Result<()> {
         instructions::update_program_config(ctx, args)
     }
+
+    // set mint token accounts
+    // buy =  transfer from transfer to
+    // withdraw once presale ended
 }

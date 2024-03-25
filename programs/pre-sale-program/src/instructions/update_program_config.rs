@@ -1,11 +1,11 @@
 use anchor_lang::prelude::*;
 use crate::state::*;
-use crate::constants::SEED_PROGRAM_CONFIG;
+use crate::constants::CONFIG_SEED;
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct UpdateProgramConfigArgs {
     pub admin: Option<Pubkey>,
-    pub mints: Option<Vec<Mint>>,
+    pub mints: Option<Vec<MintPrice>>,
     pub has_presale_ended: Option<bool>,
 }
 
@@ -14,7 +14,7 @@ pub struct UpdateProgramConfigArgs {
 pub struct UpdateProgramConfig<'info> {
     #[account(
         mut,
-        seeds = [SEED_PROGRAM_CONFIG],
+        seeds = [CONFIG_SEED],
         bump,
         realloc = ProgramConfig::get_len(args.mints.clone().unwrap_or_default().len()),
         realloc::payer = admin,
@@ -40,7 +40,7 @@ pub fn update_program_config(
     }
 
     if let Some(mints) = args.mints {
-        program_config.mints = mints;
+        program_config.prices = mints;
     }
 
     if let Some(has_presale_ended) = args.has_presale_ended {
