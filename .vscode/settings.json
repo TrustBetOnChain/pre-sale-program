@@ -1,7 +1,13 @@
 {
     "workbench.colorCustomizations": {
-        "activityBar.background": "#452040",
-        "titleBar.activeBackground": "#602D5A",
+        "activityBar.background": "#202145",
+        "titleBar.activeBackground": "#2d3160",
         "titleBar.activeForeground": "#FCF9FC"
-    }
+    },
+    "rust-analyzer.linkedProjects": [
+        "./programs/pre-sale-program/Cargo.toml",
+        "./programs/pre-sale-program/Cargo.toml",
+        "./programs/pre-sale-program/Cargo.toml",
+        "./programs/pre-sale-program/Cargo.toml"
+    ]
 }
