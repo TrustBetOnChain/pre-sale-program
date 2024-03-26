@@ -10,13 +10,13 @@ pub struct InitializeProgramConfig<'info> {
 
     #[account(
         init,
-        seeds = [TOKEN_VAULT_SEED],
+        seeds = [VAULT_SEED],
         bump,
         payer = signer,
         token::mint = mint,
-        token::authority = token_vault_account
+        token::authority = vault_account
     )]
-    pub token_vault_account: Account<'info, TokenAccount>,
+    pub vault_account: Account<'info, TokenAccount>,
 
     /// CHECK: This is an external account used for collecting funds
     pub collected_funds_account: AccountInfo<'info>,

@@ -9,7 +9,8 @@ declare_id!("5Y8A7Z6G98zukZcUfWcFfGz29Eh3N8bPPuKXbXuH5534");
 
 pub mod constants {
     pub const CONFIG_SEED: &[u8] = b"config";
-    pub const TOKEN_VAULT_SEED: &[u8] = b"token_vault";
+    pub const VAULT_SEED: &[u8] = b"vault";
+    pub const USER_VAULT_SEED: &[u8] = b"user_vault";
 }
 
 #[program]
@@ -27,7 +28,7 @@ pub mod pre_sale_program {
         instructions::update_program_config(ctx, args)
     }
 
-    // set mint token accounts
-    // buy =  transfer from transfer to
-    // withdraw once presale ended
+    pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
+        instructions::buy_tokens(ctx, args)
+    }
 }

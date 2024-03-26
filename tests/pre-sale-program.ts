@@ -1,9 +1,11 @@
 import { workspace, Program, BN } from "@coral-xyz/anchor";
 import { PreSaleProgram } from "../target/types/pre_sale_program";
-import { PublicKey } from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import chai from "chai";
 import chaiAsPromised from "chai-as-promised";
 import {
+  USDT_ADDRESS,
+  USDT_DECIMALS,
   WSOL_ADDRESS,
   WSOL_DECIMALS,
   collectedFundsKeypair,
@@ -30,7 +32,7 @@ describe("pre-sale-program", () => {
   );
 
   const [tokenVaultAddress] = PublicKey.findProgramAddressSync(
-    [Buffer.from("token_vault")],
+    [Buffer.from("vault")],
     program.programId
   );
 
@@ -47,7 +49,7 @@ describe("pre-sale-program", () => {
       .accounts({
         signer: signerKeypair.publicKey,
         programConfig: programConfigAddress,
-        tokenVaultAccount: tokenVaultAddress,
+        vaultAccount: tokenVaultAddress,
         mint: mintKeypair.publicKey,
         collectedFundsAccount: collectedFundsKeypair.publicKey,
       })
@@ -68,7 +70,7 @@ describe("pre-sale-program", () => {
         .accounts({
           signer: signerKeypair.publicKey,
           programConfig: programConfigAddress,
-          tokenVaultAccount: tokenVaultAddress,
+          vaultAccount: tokenVaultAddress,
           mint: mintKeypair.publicKey,
           collectedFundsAccount: collectedFundsKeypair.publicKey,
         })
@@ -170,13 +172,16 @@ describe("pre-sale-program", () => {
     );
 
     const solPrice = {
-      pubkey: WSOL_ADDRESS,
-      price: convertToLamports(1, WSOL_DECIMALS),
+      mint: WSOL_ADDRESS,
+      price: convertToLamports(0.5, WSOL_DECIMALS),
     };
 
-    console.log(solPrice);
+    const usdtPrice = {
+      mint: USDT_ADDRESS,
+      price: convertToLamports(50, USDT_DECIMALS),
+    };
 
-    const prices = [solPrice];
+    const prices = [solPrice, usdtPrice];
 
     await program.methods
       .updateProgramConfig({
@@ -267,7 +272,7 @@ describe("pre-sale-program", () => {
     );
 
     const mintPrice = {
-      pubkey: randomKeypair.publicKey,
+      mint: randomKeypair.publicKey,
       price: new BN(1_000_000_000),
     };
 
@@ -320,5 +325,15 @@ describe("pre-sale-program", () => {
     expect(await fetchConfigSize(updatedProgramConfigAfterNullPrices)).to.equal(
       calculateConfigSize(prices.length)
     );
+  });
+
+  it("should buy tokens", async () => {
+    await program.methods
+      .buyTokens({ amount: new BN(0) })
+      .accounts({
+        signer: randomKeypair.publicKey,
+      })
+      .signers([randomKeypair])
+      .rpc();
   });
 });

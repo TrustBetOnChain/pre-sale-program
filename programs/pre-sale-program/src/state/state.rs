@@ -19,7 +19,7 @@ impl ProgramConfig {
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct MintPrice {
-    pub pubkey: Pubkey,
+    pub mint: Pubkey,
     pub price: u64,
 }
 
