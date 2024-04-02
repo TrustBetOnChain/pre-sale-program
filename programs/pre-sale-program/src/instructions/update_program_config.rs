@@ -5,8 +5,10 @@ use crate::constants::CONFIG_SEED;
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct UpdateProgramConfigArgs {
     pub admin: Option<Pubkey>,
-    pub prices: Option<Vec<MintPrice>>,
+    pub feeds: Option<Vec<PriceFeedInfo>>,
     pub has_presale_ended: Option<bool>,
+    pub usd_price: Option<i128>,
+    pub price_decimals: Option<u8>,
     pub collected_funds_account: Option<Pubkey>,
 }
 
@@ -18,10 +20,10 @@ pub struct UpdateProgramConfig<'info> {
         seeds = [CONFIG_SEED],
         bump,
         realloc = ProgramConfig::get_len(
-            args.prices
+            args.feeds
                 .as_ref()
                 .map(|prices| prices.len())
-                .unwrap_or(program_config.prices.len())
+                .unwrap_or(program_config.feeds.len())
         ),
         realloc::payer = admin,
         realloc::zero = false,
@@ -46,8 +48,8 @@ pub fn update_program_config(
         program_config.admin = admin;
     }
 
-    if let Some(prices) = args.prices {
-        program_config.prices = prices;
+    if let Some(feeds) = args.feeds {
+        program_config.feeds = feeds;
     }
 
     if let Some(collected_funds_account) = args.collected_funds_account {

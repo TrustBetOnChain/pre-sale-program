@@ -4,6 +4,9 @@ mod instructions;
 use instructions::*;
 
 mod state;
+use state::DataFeed;
+
+mod error;
 
 declare_id!("5Y8A7Z6G98zukZcUfWcFfGz29Eh3N8bPPuKXbXuH5534");
 
@@ -31,4 +34,11 @@ pub mod pre_sale_program {
     pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
         instructions::buy_tokens(ctx, args)
     }
+
+    pub fn get_data_feed(ctx: Context<GetDataFeed>) -> Result<DataFeed> {
+        instructions::get_data_feed(ctx)
+    }
+
+    // claim
+    // withdraw
 }

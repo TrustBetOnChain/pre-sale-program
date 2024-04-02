@@ -4,6 +4,7 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
   TransactionConfirmationStrategy,
+  VersionedTransactionResponse,
 } from "@solana/web3.js";
 import { createMint } from "@solana/spl-token";
 import { BN } from "@coral-xyz/anchor";
@@ -13,11 +14,17 @@ export function calculateConfigSize(mintsLength: number) {
   const BOOL_SIZE = 1;
   const DISCRIMINATOR_SIZE = 8;
   const VECTOR_SIZE = 4;
-  const PRICE_SIZE = 8;
+  const USD_PRICE_SIZE = 16;
+  const PRICE_DECIMALS_SIZE = 1;
 
-  const MINT_SIZE = PRICE_SIZE + PUB_KEY_SIZE;
+  const MINT_SIZE = PUB_KEY_SIZE * 2;
   const BASE_CONFIG_SIZE =
-    DISCRIMINATOR_SIZE + PUB_KEY_SIZE + PUB_KEY_SIZE + BOOL_SIZE;
+    DISCRIMINATOR_SIZE +
+    PUB_KEY_SIZE +
+    PUB_KEY_SIZE +
+    BOOL_SIZE +
+    USD_PRICE_SIZE +
+    PRICE_DECIMALS_SIZE;
 
   return BASE_CONFIG_SIZE + VECTOR_SIZE + MINT_SIZE * mintsLength;
 }
@@ -56,8 +63,26 @@ export async function createSplToken(
   );
 }
 
-export function convertToLamports(amount: number, decimals: number): BN {
+export function toLamports(amount: number, decimals: number): BN {
   const multiplier = new BN(10).pow(new BN(decimals));
   const lamports = new BN(amount).mul(multiplier);
   return lamports;
 }
+
+export function convertLamports(amount: bigint, decimals: number): BN {
+  const multiplier = new BN(10).pow(new BN(decimals));
+  return new BN(amount.toString()).div(multiplier);
+}
+
+export const getReturnLog = (
+  confirmedTransaction: VersionedTransactionResponse
+): [buffer: Buffer, key: string, data: string] => {
+  const prefix = "Program return: ";
+  let log = confirmedTransaction.meta.logMessages.find((log) =>
+    log.startsWith(prefix)
+  );
+  log = log.slice(prefix.length);
+  const [key, data] = log.split(" ", 2);
+  const buffer = Buffer.from(data, "base64");
+  return [buffer, key, data];
+};

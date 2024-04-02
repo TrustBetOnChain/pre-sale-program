@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{ Mint, Token, TokenAccount };
 
-use crate::{ constants, state::* };
+use crate::{ constants, state::*, error::* };
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct BuyTokensArgs {
@@ -31,17 +31,19 @@ pub struct BuyTokens<'info> {
 
     #[account(
         mut,
-        constraint = program_config.prices.iter().any(|price| price.mint == payment_account.mint),
+        constraint = program_config.feeds.iter().any(|feed| feed.quote_mint == payer_token_account.mint),
     )]
-    pub payment_account: Account<'info, TokenAccount>,
+    pub payer_token_account: Account<'info, TokenAccount>,
 
     #[account(
-        associated_token::mint = payment_account.mint,
+        associated_token::mint = payer_token_account.mint,
         associated_token::authority = program_config.collected_funds_account
     )]
     pub collected_funds_account: Account<'info, TokenAccount>,
 
-    #[account(constraint = vault_mint.key() == vault_account.mint)]
+    #[account(
+        constraint = vault_mint.key() == vault_account.mint @ PreSaleProgramError::InvalidVaultMint,
+    )]
     pub vault_mint: Account<'info, Mint>,
 
     pub token_program: Program<'info, Token>,
@@ -49,5 +51,9 @@ pub struct BuyTokens<'info> {
 }
 
 pub fn buy_tokens(_ctx: Context<BuyTokens>, _args: BuyTokensArgs) -> Result<()> {
+    if _args.amount <= 0 {
+        return Err(PreSaleProgramError::InvalidTokenAmount.into());
+    }
+
     Ok(())
 }

@@ -54,5 +54,20 @@ export const USDT_ADDRESS = new PublicKey(
   "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
 );
 
+export const USDT_USD_FEED = new PublicKey(
+  "8vAuuqC5wVZ9Z9oQUGGDSjYgudTfjmyqGU5VucQxTk5U"
+);
+
+export const CHAINLINK_PROGRAM_ID =
+  "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny";
+
+export const SOL_USD_FEED = new PublicKey(
+  "CH31Xns5z3M1cTAbKW34jcxPPciazARpijcHj9rxtemt"
+);
+
+export const ETH_USD_FEED = "716hFAECqotxcXcj8Hs8nr7AG6q9dBw2oX3k3M8V7uGq";
+export const BNB_USD_FEED = "F6rApkRBD31K6zZrwXt8aQrRKwzbZqCMH2vbMvBgftPX";
+export const USDC_USD_FEED = "GzGuoKXE8Unn7Vcg1DtomwD27tL4bVUpSK2M1yk6Xfz5";
+
 export const WSOL_DECIMALS = 9;
 export const USDT_DECIMALS = 6;

@@ -6,3 +6,6 @@ pub use update_program_config::*;
 
 mod buy_tokens;
 pub use buy_tokens::*;
+
+mod get_data_feed;
+pub use get_data_feed::*;

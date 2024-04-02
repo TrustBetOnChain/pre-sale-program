@@ -8,11 +8,35 @@ skip-lint = false
 pre_sale_program = "5Y8A7Z6G98zukZcUfWcFfGz29Eh3N8bPPuKXbXuH5534"
 
 [registry]
-url = "https://api.apr.dev"
+url = "https://anchor.projectserum.com"
 
 [provider]
-cluster = "Localnet"
+cluster = "localnet"
 wallet = "/Users/yanmarinich/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[test]
+startup_wait = 5000
+
+[test.validator]
+url = "https://api.mainnet-beta.solana.com" # This is the url of the cluster that accounts are cloned from (See `test.validator.clone`).
+
+
+[[test.genesis]]
+address = "HEvSKofvBgfaexv23kMabbYqxasxU3mQ4ibBMEmJWHny"
+program = "dumps/chainlink.so"
+
+[[test.validator.clone]]
+address = "CH31Xns5z3M1cTAbKW34jcxPPciazARpijcHj9rxtemt" #chainlink SOL_USD Price feed
+[[test.validator.clone]]
+address = "GzGuoKXE8Unn7Vcg1DtomwD27tL4bVUpSK2M1yk6Xfz5" #chainlink USDC / USD Price feed
+[[test.validator.clone]]
+address = "8vAuuqC5wVZ9Z9oQUGGDSjYgudTfjmyqGU5VucQxTk5U" #chainlink USDT / USD Price feed
+[[test.validator.clone]]
+address = "F6rApkRBD31K6zZrwXt8aQrRKwzbZqCMH2vbMvBgftPX" #chainlink BNB / USD Price feed
+[[test.validator.clone]]
+address = "716hFAECqotxcXcj8Hs8nr7AG6q9dBw2oX3k3M8V7uGq" #chainlink ETH / USD Price feed
+[[test.validator.clone]]
+address = "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o" #chainlink BTC / USD Price feed
