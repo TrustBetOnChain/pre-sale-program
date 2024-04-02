@@ -541,7 +541,7 @@ Program log: ${programConfig.collectedFundsAccount}`);
 Program log: Left:
 Program log: ${wrongAtaForCollecting}
 Program log: Right:
-sProgram log: ${expectedAtaForCollecting}`);
+Program log: ${expectedAtaForCollecting}`);
   });
 
   it("should fail when vault mint is invalid", async () => {
