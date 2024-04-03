@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{ Mint, Token, TokenAccount };
-use std::ops::{ Add, Div, Mul };
+use std::ops::{ Div, Mul };
 
 use crate::{ constants, error::*, state::*, utils };
 use chainlink_solana as chainlink;
