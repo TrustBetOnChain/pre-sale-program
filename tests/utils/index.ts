@@ -14,12 +14,13 @@ export function calculateConfigSize(mintsLength: number) {
   const BOOL_SIZE = 1;
   const DISCRIMINATOR_SIZE = 8;
   const VECTOR_SIZE = 4;
-  const USD_PRICE_SIZE = 16;
+  const USD_PRICE_SIZE = 8;
   const PRICE_DECIMALS_SIZE = 1;
 
   const MINT_SIZE = PUB_KEY_SIZE * 2;
   const BASE_CONFIG_SIZE =
     DISCRIMINATOR_SIZE +
+    PUB_KEY_SIZE +
     PUB_KEY_SIZE +
     PUB_KEY_SIZE +
     BOOL_SIZE +

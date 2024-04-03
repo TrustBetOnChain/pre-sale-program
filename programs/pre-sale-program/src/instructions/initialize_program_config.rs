@@ -26,6 +26,8 @@ pub struct InitializeProgramConfig<'info> {
     )]
     pub signer: Signer<'info>,
     pub mint: Account<'info, Mint>,
+    /// CHECK: This is the Chainlink program library
+    pub chainlink_program: AccountInfo<'info>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -34,5 +36,6 @@ pub fn initialize_program_config(ctx: Context<InitializeProgramConfig>) -> Resul
     let program_config = &mut ctx.accounts.program_config;
     program_config.admin = ctx.accounts.signer.key();
     program_config.collected_funds_account = ctx.accounts.collected_funds_account.key();
+    program_config.chainlink_program = ctx.accounts.chainlink_program.key();
     Ok(())
 }

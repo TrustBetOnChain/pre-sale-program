@@ -8,4 +8,8 @@ pub enum PreSaleProgramError {
     InvalidTokenAmount,
     #[msg("Provided price feed account is invalid")]
     InvalidPriceFeed,
+    #[msg("Invalid Chainlink program account")]
+    InvalidChainlinkProgram,
+    #[msg("Math operation overflow")]
+    MathOverflow,
 }

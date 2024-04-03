@@ -4,12 +4,14 @@ import * as borsh from "borsh";
 import { PreSaleProgram } from "../target/types/pre_sale_program";
 import {
   GetVersionedTransactionConfig,
+  LAMPORTS_PER_SOL,
   PublicKey,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import chai from "chai";
 import chaiAsPromised from "chai-as-promised";
 import {
+  BNB_USD_FEED,
   CHAINLINK_PROGRAM_ID,
   SOL_USD_FEED,
   USDC_USD_FEED,
@@ -104,6 +106,7 @@ describe("pre-sale-program", () => {
         vaultAccount: tokenVaultAddress,
         mint: mintKeypair.publicKey,
         collectedFundsAccount: collectedFundsKeypair.publicKey,
+        chainlinkProgram: BNB_USD_FEED,
       })
       .signers([signerKeypair])
       .rpc();
@@ -137,6 +140,7 @@ describe("pre-sale-program", () => {
           vaultAccount: tokenVaultAddress,
           mint: mintKeypair.publicKey,
           collectedFundsAccount: collectedFundsKeypair.publicKey,
+          chainlinkProgram: CHAINLINK_PROGRAM_ID,
         })
         .signers([signerKeypair])
         .rpc()
@@ -153,8 +157,9 @@ describe("pre-sale-program", () => {
           admin: randomKeypair.publicKey,
           feeds: [],
           usdPrice: new BN(50),
-          priceDecimals: 2,
+          usdDecimals: 2,
           collectedFundsAccount: randomKeypair.publicKey,
+          chainlinkProgram: CHAINLINK_PROGRAM_ID,
         })
         .accounts({
           programConfig: programConfigAddress,
@@ -177,8 +182,9 @@ describe("pre-sale-program", () => {
         admin: null,
         feeds: null,
         usdPrice: null,
-        priceDecimals: null,
+        usdDecimals: null,
         collectedFundsAccount: null,
+        chainlinkProgram: null,
       })
       .accounts({
         programConfig: programConfigAddress,
@@ -212,8 +218,9 @@ describe("pre-sale-program", () => {
         admin: randomKeypair.publicKey,
         feeds: null,
         usdPrice: null,
-        priceDecimals: null,
+        usdDecimals: null,
         collectedFundsAccount: null,
+        chainlinkProgram: null,
       })
       .accounts({
         programConfig: programConfigAddress,
@@ -242,12 +249,12 @@ describe("pre-sale-program", () => {
     );
 
     const usdtFeed = {
-      quoteMint: USDT_ADDRESS,
+      asset: USDT_ADDRESS,
       dataFeed: USDT_USD_FEED,
     };
 
     const solFeed = {
-      quoteMint: WSOL_ADDRESS,
+      asset: WSOL_ADDRESS,
       dataFeed: SOL_USD_FEED,
     };
 
@@ -259,8 +266,9 @@ describe("pre-sale-program", () => {
         admin: null,
         feeds,
         usdPrice: null,
-        priceDecimals: null,
+        usdDecimals: null,
         collectedFundsAccount: null,
+        chainlinkProgram: null,
       })
       .accounts({
         admin: randomKeypair.publicKey,
@@ -302,8 +310,9 @@ describe("pre-sale-program", () => {
         admin: null,
         feeds: null,
         usdPrice: null,
-        priceDecimals: null,
+        usdDecimals: null,
         collectedFundsAccount: randomKeypair.publicKey,
+        chainlinkProgram: null,
       })
       .accounts({
         admin: randomKeypair.publicKey,
@@ -331,6 +340,117 @@ describe("pre-sale-program", () => {
     );
   });
 
+  it("should only update Chainlink value", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    await program.methods
+      .updateProgramConfig({
+        hasPresaleEnded: null,
+        admin: null,
+        feeds: null,
+        usdPrice: null,
+        usdDecimals: null,
+        collectedFundsAccount: null,
+        chainlinkProgram: CHAINLINK_PROGRAM_ID,
+      })
+      .accounts({
+        admin: randomKeypair.publicKey,
+        programConfig: programConfigAddress,
+      })
+      .signers([randomKeypair])
+      .rpc();
+
+    const updatedProgramConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    expect(programConfig.admin.toString()).to.equal(
+      updatedProgramConfig.admin.toString()
+    );
+
+    expect(programConfig.usdPrice.eq(updatedProgramConfig.usdPrice)).to.be.true;
+    expect(programConfig.usdDecimals).to.equal(
+      updatedProgramConfig.usdDecimals
+    );
+
+    expect(JSON.stringify(programConfig.feeds)).to.equal(
+      JSON.stringify(updatedProgramConfig.feeds)
+    );
+    expect(programConfig.hasPresaleEnded).to.equal(
+      updatedProgramConfig.hasPresaleEnded
+    );
+    expect(programConfig.collectedFundsAccount.toString()).to.equal(
+      updatedProgramConfig.collectedFundsAccount.toString()
+    );
+
+    expect(programConfig.chainlinkProgram.toString()).to.not.equal(
+      updatedProgramConfig.chainlinkProgram.toString()
+    );
+
+    expect(updatedProgramConfig.chainlinkProgram.toString()).to.equal(
+      CHAINLINK_PROGRAM_ID.toString()
+    );
+  });
+
+  it("should only update price value", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const usdPrice = 0.5;
+    const usdDecimals = 2;
+
+    await program.methods
+      .updateProgramConfig({
+        hasPresaleEnded: null,
+        admin: null,
+        feeds: null,
+        usdPrice: new BN(usdPrice * 10 ** usdDecimals),
+        usdDecimals,
+        collectedFundsAccount: null,
+        chainlinkProgram: CHAINLINK_PROGRAM_ID,
+      })
+      .accounts({
+        admin: randomKeypair.publicKey,
+        programConfig: programConfigAddress,
+      })
+      .signers([randomKeypair])
+      .rpc();
+
+    const updatedProgramConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    expect(programConfig.admin.toString()).to.equal(
+      updatedProgramConfig.admin.toString()
+    );
+
+    expect(JSON.stringify(programConfig.feeds)).to.equal(
+      JSON.stringify(updatedProgramConfig.feeds)
+    );
+    expect(programConfig.hasPresaleEnded).to.equal(
+      updatedProgramConfig.hasPresaleEnded
+    );
+    expect(programConfig.collectedFundsAccount.toString()).to.equal(
+      updatedProgramConfig.collectedFundsAccount.toString()
+    );
+
+    expect(programConfig.usdPrice.toString()).to.not.equal(
+      updatedProgramConfig.usdPrice.toString()
+    );
+
+    expect(programConfig.usdDecimals).to.not.equal(
+      updatedProgramConfig.usdDecimals
+    );
+
+    expect(updatedProgramConfig.usdDecimals).to.equal(usdDecimals);
+    expect(updatedProgramConfig.usdPrice.toNumber()).to.equal(
+      usdPrice * 10 ** usdDecimals
+    );
+  });
+
   it("should allocate and reallocate right size", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
@@ -346,12 +466,12 @@ describe("pre-sale-program", () => {
     );
 
     const usdtFeed = {
-      quoteMint: USDT_ADDRESS,
+      asset: USDT_ADDRESS,
       dataFeed: USDT_USD_FEED,
     };
 
     const solFeed = {
-      quoteMint: WSOL_ADDRESS,
+      asset: WSOL_ADDRESS,
       dataFeed: SOL_USD_FEED,
     };
 
@@ -363,8 +483,9 @@ describe("pre-sale-program", () => {
         admin: null,
         feeds,
         usdPrice: null,
-        priceDecimals: null,
+        usdDecimals: null,
         collectedFundsAccount: null,
+        chainlinkProgram: null,
       })
       .accounts({
         admin: randomKeypair.publicKey,
@@ -388,8 +509,9 @@ describe("pre-sale-program", () => {
         admin: null,
         feeds,
         usdPrice: null,
-        priceDecimals: null,
+        usdDecimals: null,
         collectedFundsAccount: null,
+        chainlinkProgram: null,
       })
       .accounts({
         admin: randomKeypair.publicKey,
@@ -438,7 +560,7 @@ describe("pre-sale-program", () => {
 
     await expect(
       program.methods
-        .buyTokens({ amount: new BN(0) })
+        .buyTokens({ payerTokenAmount: new BN(0) })
         .accounts({
           signer: randomKeypair.publicKey,
           programConfig: programConfigAddress,
@@ -447,6 +569,9 @@ describe("pre-sale-program", () => {
           userVaultAccount: userVaultAddress,
           payerTokenAccount: wsolAtaForPayment,
           collectedFundsAccount: wrongWsolAtaForCollecting,
+          payerMint: WSOL_ADDRESS,
+          chainlinkFeed: WSOL_ADDRESS,
+          chainlinkProgram: CHAINLINK_PROGRAM_ID,
         })
         .signers([randomKeypair])
         .rpc()
@@ -482,7 +607,7 @@ Program log: ${programConfig.collectedFundsAccount}`);
 
     await expect(
       program.methods
-        .buyTokens({ amount: new BN(0) })
+        .buyTokens({ payerTokenAmount: new BN(0) })
         .accounts({
           signer: randomKeypair.publicKey,
           programConfig: programConfigAddress,
@@ -491,6 +616,9 @@ Program log: ${programConfig.collectedFundsAccount}`);
           userVaultAccount: userVaultAddress,
           payerTokenAccount: ataForPayment,
           collectedFundsAccount: ataForCollecting,
+          payerMint: WSOL_ADDRESS,
+          chainlinkFeed: WSOL_ADDRESS,
+          chainlinkProgram: CHAINLINK_PROGRAM_ID,
         })
         .signers([randomKeypair])
         .rpc()
@@ -524,7 +652,7 @@ Program log: ${programConfig.collectedFundsAccount}`);
 
     await expect(
       program.methods
-        .buyTokens({ amount: new BN(0) })
+        .buyTokens({ payerTokenAmount: new BN(0) })
         .accounts({
           signer: randomKeypair.publicKey,
           programConfig: programConfigAddress,
@@ -533,6 +661,9 @@ Program log: ${programConfig.collectedFundsAccount}`);
           userVaultAccount: userVaultAddress,
           payerTokenAccount: wsolAtaForPayment,
           collectedFundsAccount: wrongAtaForCollecting,
+          payerMint: WSOL_ADDRESS,
+          chainlinkFeed: WSOL_ADDRESS,
+          chainlinkProgram: CHAINLINK_PROGRAM_ID,
         })
         .signers([randomKeypair])
         .rpc()
@@ -566,7 +697,7 @@ Program log: ${expectedAtaForCollecting}`);
 
     await expect(
       program.methods
-        .buyTokens({ amount: new BN(0) })
+        .buyTokens({ payerTokenAmount: new BN(0) })
         .accounts({
           signer: randomKeypair.publicKey,
           programConfig: programConfigAddress,
@@ -575,6 +706,9 @@ Program log: ${expectedAtaForCollecting}`);
           userVaultAccount: userVaultAddress,
           payerTokenAccount: wsolAtaForPayment,
           collectedFundsAccount: ataForCollecting,
+          payerMint: WSOL_ADDRESS,
+          chainlinkFeed: WSOL_ADDRESS,
+          chainlinkProgram: CHAINLINK_PROGRAM_ID,
         })
         .signers([randomKeypair])
         .rpc()
@@ -601,7 +735,7 @@ Program log: ${expectedAtaForCollecting}`);
 
     await expect(
       program.methods
-        .buyTokens({ amount: new BN(0) })
+        .buyTokens({ payerTokenAmount: new BN(0) })
         .accounts({
           signer: randomKeypair.publicKey,
           programConfig: programConfigAddress,
@@ -610,11 +744,86 @@ Program log: ${expectedAtaForCollecting}`);
           userVaultAccount: userVaultAddress,
           payerTokenAccount: wsolAtaForPayment,
           collectedFundsAccount: wsolAtaForCollecting,
+          payerMint: WSOL_ADDRESS,
+          chainlinkFeed: WSOL_ADDRESS,
+          chainlinkProgram: CHAINLINK_PROGRAM_ID,
         })
         .signers([randomKeypair])
         .rpc()
     ).to.be.rejectedWith(
       `AnchorError occurred. Error Code: InvalidTokenAmount. Error Number: 6001. Error Message: Token amount should be greater than 0`
     );
+  });
+
+  it("should buy tokens", async () => {
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), randomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const wsolAtaForPayment = await getAssociatedTokenAddress(
+      WSOL_ADDRESS,
+      signerKeypair.publicKey
+    );
+
+    const wsolAtaForCollecting = await getAssociatedTokenAddress(
+      WSOL_ADDRESS,
+      randomKeypair.publicKey
+    );
+
+    // await expect(
+    await program.methods
+      .buyTokens({ payerTokenAmount: new BN(1_000_000_000) })
+      .accounts({
+        signer: randomKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: wsolAtaForPayment,
+        collectedFundsAccount: wsolAtaForCollecting,
+        payerMint: WSOL_ADDRESS,
+        chainlinkProgram: CHAINLINK_PROGRAM_ID,
+        chainlinkFeed: USDT_USD_FEED,
+      })
+      .signers([randomKeypair])
+      .rpc();
+    // ).to.be.rejectedWith(
+    //   `AnchorError occurred. Error Code: InvalidTokenAmount. Error Number: 6001. Error Message: Token amount should be greater than 0`
+    // );
+  });
+
+  it("should buy tokens", async () => {
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), randomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const wsolAtaForPayment = await getAssociatedTokenAddress(
+      WSOL_ADDRESS,
+      signerKeypair.publicKey
+    );
+
+    const wsolAtaForCollecting = await getAssociatedTokenAddress(
+      WSOL_ADDRESS,
+      randomKeypair.publicKey
+    );
+
+    await program.methods
+      .buyTokens({ payerTokenAmount: new BN(1 * 10 ** (9 - 1)) })
+      .accounts({
+        signer: randomKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: wsolAtaForPayment,
+        collectedFundsAccount: wsolAtaForCollecting,
+        chainlinkProgram: CHAINLINK_PROGRAM_ID,
+        payerMint: WSOL_ADDRESS,
+        chainlinkFeed: SOL_USD_FEED,
+      })
+      .signers([randomKeypair])
+      .rpc();
   });
 });

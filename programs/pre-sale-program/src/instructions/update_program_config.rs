@@ -7,9 +7,10 @@ pub struct UpdateProgramConfigArgs {
     pub admin: Option<Pubkey>,
     pub feeds: Option<Vec<PriceFeedInfo>>,
     pub has_presale_ended: Option<bool>,
-    pub usd_price: Option<i128>,
-    pub price_decimals: Option<u8>,
+    pub usd_price: Option<u64>,
+    pub usd_decimals: Option<u8>,
     pub collected_funds_account: Option<Pubkey>,
+    pub chainlink_program: Option<Pubkey>,
 }
 
 #[derive(Accounts)]
@@ -54,6 +55,18 @@ pub fn update_program_config(
 
     if let Some(collected_funds_account) = args.collected_funds_account {
         program_config.collected_funds_account = collected_funds_account;
+    }
+
+    if let Some(chainlink_program) = args.chainlink_program {
+        program_config.chainlink_program = chainlink_program;
+    }
+
+    if let Some(usd_price) = args.usd_price {
+        program_config.usd_price = usd_price;
+    }
+
+    if let Some(usd_decimals) = args.usd_decimals {
+        program_config.usd_decimals = usd_decimals;
     }
 
     if let Some(has_presale_ended) = args.has_presale_ended {

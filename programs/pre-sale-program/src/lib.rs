@@ -7,8 +7,9 @@ mod state;
 use state::DataFeed;
 
 mod error;
+mod utils;
 
-declare_id!("5Y8A7Z6G98zukZcUfWcFfGz29Eh3N8bPPuKXbXuH5534");
+declare_id!("4hPuDXNwStdVPCKukJPvHMgRxtFgQxKexVZQeTcHUdq6");
 
 pub mod constants {
     pub const CONFIG_SEED: &[u8] = b"config";
@@ -31,14 +32,11 @@ pub mod pre_sale_program {
         instructions::update_program_config(ctx, args)
     }
 
-    pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
-        instructions::buy_tokens(ctx, args)
-    }
-
     pub fn get_data_feed(ctx: Context<GetDataFeed>) -> Result<DataFeed> {
         instructions::get_data_feed(ctx)
     }
 
-    // claim
-    // withdraw
+    pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
+        instructions::buy_tokens(ctx, args)
+    }
 }
