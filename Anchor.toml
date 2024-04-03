@@ -40,3 +40,5 @@ address = "F6rApkRBD31K6zZrwXt8aQrRKwzbZqCMH2vbMvBgftPX" #chainlink BNB / USD Pr
 address = "716hFAECqotxcXcj8Hs8nr7AG6q9dBw2oX3k3M8V7uGq" #chainlink ETH / USD Price feed
 [[test.validator.clone]]
 address = "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o" #chainlink BTC / USD Price feed
+[[test.validator.clone]]
+address = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB" #USDT

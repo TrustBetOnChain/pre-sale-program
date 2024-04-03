@@ -33,12 +33,12 @@ pub struct BuyTokens<'info> {
 
     #[account(
         mut,
-        constraint = program_config.feeds.iter().any(|feed| feed.asset == payer_token_account.mint),
+        constraint =  payer_token_account.mint ==  payer_mint.key() @ PreSaleProgramError::InvalidPayerTokenAccount,
     )]
     pub payer_token_account: Account<'info, TokenAccount>,
 
     #[account(
-        associated_token::mint = payer_token_account.mint,
+        associated_token::mint = payer_mint.key(),
         associated_token::authority = program_config.collected_funds_account
     )]
     pub collected_funds_account: Account<'info, TokenAccount>,
@@ -48,10 +48,15 @@ pub struct BuyTokens<'info> {
     )]
     pub vault_mint: Account<'info, Mint>,
 
-    #[account(constraint = payer_mint.key() == payer_token_account.mint)]
+    #[account()]
     pub payer_mint: Account<'info, Mint>,
 
     /// CHECK: We're reading data from this specified chainlink feed
+    #[account(
+        constraint = program_config.feeds
+            .iter()
+            .any(|feed| feed.asset == payer_mint.key() && feed.data_feed == chainlink_feed.key()) @ PreSaleProgramError::InvalidChainlinkFeed
+    )]
     pub chainlink_feed: AccountInfo<'info>,
     #[account(
         constraint = chainlink_program.key() == program_config.chainlink_program @ PreSaleProgramError::InvalidChainlinkProgram

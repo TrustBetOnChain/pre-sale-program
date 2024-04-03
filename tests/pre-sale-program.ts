@@ -623,7 +623,7 @@ Program log: ${programConfig.collectedFundsAccount}`);
         .signers([randomKeypair])
         .rpc()
     ).to.be.rejectedWith(
-      `AnchorError caused by account: payer_token_account. Error Code: ConstraintRaw. Error Number: 2003. Error Message: A raw constraint was violated.`
+      `AnchorError caused by account: payer_token_account. Error Code: InvalidPayerTokenAccount. Error Number: 6001. Error Message: Invalid payer token account.`
     );
   });
 
@@ -745,13 +745,13 @@ Program log: ${expectedAtaForCollecting}`);
           payerTokenAccount: wsolAtaForPayment,
           collectedFundsAccount: wsolAtaForCollecting,
           payerMint: WSOL_ADDRESS,
-          chainlinkFeed: WSOL_ADDRESS,
+          chainlinkFeed: SOL_USD_FEED,
           chainlinkProgram: CHAINLINK_PROGRAM_ID,
         })
         .signers([randomKeypair])
         .rpc()
     ).to.be.rejectedWith(
-      `AnchorError occurred. Error Code: InvalidTokenAmount. Error Number: 6001. Error Message: Token amount should be greater than 0`
+      `AnchorError occurred. Error Code: InvalidTokenAmount. Error Number: 6002. Error Message: Token amount should be greater than 0.`
     );
   });
 
@@ -761,14 +761,18 @@ Program log: ${expectedAtaForCollecting}`);
       program.programId
     );
 
-    const wsolAtaForPayment = await getAssociatedTokenAddress(
-      WSOL_ADDRESS,
-      signerKeypair.publicKey
+    const ataForCollecting = await createAssociatedTokenAccount(
+      connection,
+      randomKeypair,
+      USDT_ADDRESS,
+      randomKeypair.publicKey
     );
 
-    const wsolAtaForCollecting = await getAssociatedTokenAddress(
-      WSOL_ADDRESS,
-      randomKeypair.publicKey
+    const ataForPayment = await createAssociatedTokenAccount(
+      connection,
+      randomKeypair,
+      USDT_ADDRESS,
+      signerKeypair.publicKey
     );
 
     // await expect(
@@ -780,9 +784,9 @@ Program log: ${expectedAtaForCollecting}`);
         vaultAccount: tokenVaultAddress,
         vaultMint: mintKeypair.publicKey,
         userVaultAccount: userVaultAddress,
-        payerTokenAccount: wsolAtaForPayment,
-        collectedFundsAccount: wsolAtaForCollecting,
-        payerMint: WSOL_ADDRESS,
+        payerTokenAccount: ataForPayment,
+        collectedFundsAccount: ataForCollecting,
+        payerMint: USDT_ADDRESS,
         chainlinkProgram: CHAINLINK_PROGRAM_ID,
         chainlinkFeed: USDT_USD_FEED,
       })
