@@ -65,37 +65,37 @@ describe("pre-sale-program", () => {
     await createSplToken(signerKeypair, mintKeypair, 9, connection);
   });
 
-  it("should return price feed!", async () => {
-    interface Feed {
-      decimals: number;
-      description: string;
-      value: bigint;
-    }
+  // it("should return price feed!", async () => {
+  //   interface Feed {
+  //     decimals: number;
+  //     description: string;
+  //     value: bigint;
+  //   }
 
-    const usdt_feed: Feed = await program.methods
-      .getDataFeed()
-      .accounts({
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
-        chainlinkFeed: USDT_USD_FEED,
-      })
-      .view();
+  //   const usdt_feed: Feed = await program.methods
+  //     .getDataFeed()
+  //     .accounts({
+  //       chainlinkProgram: CHAINLINK_PROGRAM_ID,
+  //       chainlinkFeed: USDT_USD_FEED,
+  //     })
+  //     .view();
 
-    const usdtUsdPrice = convertLamports(usdt_feed.value, usdt_feed.decimals);
-    // TODO: figure out how to round stable coins
-    // expect(usdtUsdPrice.eqn(1)).to.be.true;
+  //   const usdtUsdPrice = convertLamports(usdt_feed.value, usdt_feed.decimals);
+  //   // TODO: figure out how to round stable coins
+  //   // expect(usdtUsdPrice.eqn(1)).to.be.true;
 
-    const usdc_feed: Feed = await program.methods
-      .getDataFeed()
-      .accounts({
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
-        chainlinkFeed: USDC_USD_FEED,
-      })
-      .view();
+  //   const usdc_feed: Feed = await program.methods
+  //     .getDataFeed()
+  //     .accounts({
+  //       chainlinkProgram: CHAINLINK_PROGRAM_ID,
+  //       chainlinkFeed: USDC_USD_FEED,
+  //     })
+  //     .view();
 
-    const usdcUsdPrice = convertLamports(usdc_feed.value, usdc_feed.decimals);
-    // TODO: figure out how to round stable coins
-    // expect(usdcUsdPrice.eqn(1)).to.be.true;
-  });
+  //   const usdcUsdPrice = convertLamports(usdc_feed.value, usdc_feed.decimals);
+  //   // TODO: figure out how to round stable coins
+  //   // expect(usdcUsdPrice.eqn(1)).to.be.true;
+  // });
 
   it("should be initialized!", async () => {
     await program.methods
@@ -560,7 +560,7 @@ describe("pre-sale-program", () => {
 
     await expect(
       program.methods
-        .buyTokens({ payerTokenAmount: new BN(0) })
+        .buyTokens({ payerMintAmount: new BN(0) })
         .accounts({
           signer: randomKeypair.publicKey,
           programConfig: programConfigAddress,
@@ -607,7 +607,7 @@ Program log: ${programConfig.collectedFundsAccount}`);
 
     await expect(
       program.methods
-        .buyTokens({ payerTokenAmount: new BN(0) })
+        .buyTokens({ payerMintAmount: new BN(0) })
         .accounts({
           signer: randomKeypair.publicKey,
           programConfig: programConfigAddress,
@@ -652,7 +652,7 @@ Program log: ${programConfig.collectedFundsAccount}`);
 
     await expect(
       program.methods
-        .buyTokens({ payerTokenAmount: new BN(0) })
+        .buyTokens({ payerMintAmount: new BN(0) })
         .accounts({
           signer: randomKeypair.publicKey,
           programConfig: programConfigAddress,
@@ -697,7 +697,7 @@ Program log: ${expectedAtaForCollecting}`);
 
     await expect(
       program.methods
-        .buyTokens({ payerTokenAmount: new BN(0) })
+        .buyTokens({ payerMintAmount: new BN(0) })
         .accounts({
           signer: randomKeypair.publicKey,
           programConfig: programConfigAddress,
@@ -735,7 +735,7 @@ Program log: ${expectedAtaForCollecting}`);
 
     await expect(
       program.methods
-        .buyTokens({ payerTokenAmount: new BN(0) })
+        .buyTokens({ payerMintAmount: new BN(0) })
         .accounts({
           signer: randomKeypair.publicKey,
           programConfig: programConfigAddress,
@@ -777,7 +777,7 @@ Program log: ${expectedAtaForCollecting}`);
 
     // await expect(
     await program.methods
-      .buyTokens({ payerTokenAmount: new BN(1_000_000_000) })
+      .buyTokens({ payerMintAmount: new BN(1_000_000_000) })
       .accounts({
         signer: randomKeypair.publicKey,
         programConfig: programConfigAddress,
@@ -814,7 +814,7 @@ Program log: ${expectedAtaForCollecting}`);
     );
 
     await program.methods
-      .buyTokens({ payerTokenAmount: new BN(1 * 10 ** (9 - 1)) })
+      .buyTokens({ payerMintAmount: new BN(1 * 10 ** (9 - 1)) })
       .accounts({
         signer: randomKeypair.publicKey,
         programConfig: programConfigAddress,
@@ -829,5 +829,20 @@ Program log: ${expectedAtaForCollecting}`);
       })
       .signers([randomKeypair])
       .rpc();
+  });
+
+  it("should return vault token amount available for payer tokens", async () => {
+    const amount = await program.methods
+      .getTokenAmount({ payerMintAmount: new BN(1 * 10 ** (9 - 1)) })
+      .accounts({
+        programConfig: programConfigAddress,
+        vaultMint: mintKeypair.publicKey,
+        chainlinkProgram: CHAINLINK_PROGRAM_ID,
+        payerMint: WSOL_ADDRESS,
+        chainlinkFeed: SOL_USD_FEED,
+      })
+      .view();
+
+    console.log(amount.toNumber() / 10 ** WSOL_DECIMALS);
   });
 });

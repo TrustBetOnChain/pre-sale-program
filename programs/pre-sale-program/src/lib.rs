@@ -4,7 +4,6 @@ mod instructions;
 use instructions::*;
 
 mod state;
-use state::DataFeed;
 
 mod error;
 mod utils;
@@ -32,8 +31,8 @@ pub mod pre_sale_program {
         instructions::update_program_config(ctx, args)
     }
 
-    pub fn get_data_feed(ctx: Context<GetDataFeed>) -> Result<DataFeed> {
-        instructions::get_data_feed(ctx)
+    pub fn get_token_amount(ctx: Context<GetTokenAmount>, args: GetTokenAmountArgs) -> Result<u64> {
+        instructions::get_token_amount(ctx, args)
     }
 
     pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {

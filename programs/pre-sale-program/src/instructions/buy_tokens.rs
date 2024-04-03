@@ -1,13 +1,12 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{ Mint, Token, TokenAccount };
-use std::ops::{ Div, Mul };
 
 use crate::{ constants, error::*, state::*, utils };
 use chainlink_solana as chainlink;
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct BuyTokensArgs {
-    pub payer_token_amount: u64,
+    pub payer_mint_amount: u64,
 }
 
 #[derive(Accounts)]
@@ -69,24 +68,20 @@ pub struct BuyTokens<'info> {
 }
 
 pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
-    if args.payer_token_amount <= 0 {
+    if args.payer_mint_amount <= 0 {
         return Err(PreSaleProgramError::InvalidTokenAmount.into());
     }
 
     let BuyTokens { chainlink_program, chainlink_feed, program_config, .. } = &ctx.accounts;
-    let payer_token_amount = args.payer_token_amount;
+    let payer_mint_amount = args.payer_mint_amount;
     let payer_decimals = ctx.accounts.payer_mint.decimals;
     let usd_decimals = program_config.usd_decimals;
     let usd_price = program_config.usd_price;
+    let vault_mint_decimals = ctx.accounts.vault_mint.decimals;
 
     let round = chainlink::latest_round_data(
         chainlink_program.to_account_info(),
         chainlink_feed.to_account_info()
-    )?;
-
-    let description = chainlink::description(
-        ctx.accounts.chainlink_program.to_account_info(),
-        ctx.accounts.chainlink_feed.to_account_info()
     )?;
 
     let feed_decimals = chainlink::decimals(
@@ -94,25 +89,17 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
         chainlink_feed.to_account_info()
     )?;
 
-    let asset_decimals = ctx.accounts.vault_mint.decimals;
+    let mint_amount = utils::calculate_token_amount(
+        round.answer as u64,
+        feed_decimals,
+        payer_mint_amount,
+        payer_decimals,
+        usd_price,
+        usd_decimals,
+        vault_mint_decimals
+    );
 
-    let f_feed_value = utils::convert_to_float(round.answer as u64, feed_decimals);
-    let f_payer_token_amount = utils::convert_to_float(payer_token_amount, payer_decimals);
-    let f_payer_usd_amount = f_feed_value.mul(f_payer_token_amount);
-    let f_usd_price = utils::convert_to_float(usd_price, usd_decimals);
-    let f_token_amount = f_payer_usd_amount.div(f_usd_price);
+    msg!("- mint_amount: {}", mint_amount);
 
-    let token_amount = utils::convert_from_float(f_token_amount, asset_decimals);
-
-    msg!("- description: {}", description);
-    msg!("- f_feed_value: {}", f_feed_value);
-    msg!("- f_payer_token_amount: {}", f_payer_token_amount);
-    msg!("- f_payer_usd_amount: {}", f_payer_usd_amount);
-    msg!("- f_token_amount: {}", f_token_amount);
-    msg!("- token_amount: {}", token_amount);
-    msg!("- f_usd_price: {}", f_usd_price);
-    msg!("- feed_decimals: {}", feed_decimals);
-    msg!("- payer_decimals: {}", payer_decimals);
-    msg!("- asset_decimals: {}", asset_decimals);
     Ok(())
 }
