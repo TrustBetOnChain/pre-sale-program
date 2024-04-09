@@ -19,3 +19,4 @@ default = []
 anchor-lang = { language = "0.29.0", features = ["init-if-needed"] }
 anchor-spl = "0.29.0"
 chainlink_solana = "1.0.0"
+rust_decimal = "1.28.1"

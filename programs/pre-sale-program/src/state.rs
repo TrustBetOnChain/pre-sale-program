@@ -33,3 +33,10 @@ impl PriceFeedInfo {
         Self::LEN
     }
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct DataFeed {
+    pub value: i128,
+    pub description: String,
+    pub decimals: u8,
+}

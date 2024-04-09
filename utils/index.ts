@@ -8,6 +8,7 @@ import {
 } from "@solana/web3.js";
 import { createMint } from "@solana/spl-token";
 import { BN } from "@coral-xyz/anchor";
+import fs, { promises } from "fs";
 
 export function calculateConfigSize(mintsLength: number) {
   const PUB_KEY_SIZE = 32;
@@ -87,3 +88,18 @@ export const getReturnLog = (
   const buffer = Buffer.from(data, "base64");
   return [buffer, key, data];
 };
+
+export function getKeypair(secretKeyJsonPath: string): Keypair {
+  const keyStr = fs.readFileSync(secretKeyJsonPath, "utf8");
+  const privateKey = JSON.parse(keyStr);
+
+  return Keypair.fromSecretKey(new Uint8Array(privateKey));
+}
+
+export async function savePrivateKey(
+  keypair: Keypair,
+  path: string
+): Promise<void> {
+  const secretKeyArray = Array.from(keypair.secretKey);
+  await promises.writeFile(path, JSON.stringify(secretKeyArray));
+}

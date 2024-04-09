@@ -89,17 +89,17 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
         chainlink_feed.to_account_info()
     )?;
 
-    let mint_amount = utils::calculate_token_amount(
-        round.answer as u64,
-        feed_decimals,
-        payer_mint_amount,
-        payer_decimals,
-        usd_price,
-        usd_decimals,
-        vault_mint_decimals
-    );
+    // let mint_amount = utils::calculate_token_amount(
+    //     round.answer as u64,
+    //     feed_decimals,
+    //     payer_mint_amount,
+    //     payer_decimals,
+    //     usd_price,
+    //     usd_decimals,
+    //     vault_mint_decimals
+    // );
 
-    msg!("- mint_amount: {}", mint_amount);
+    // msg!("- mint_amount: {}", mint_amount);
 
     Ok(())
 }
