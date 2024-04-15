@@ -5,11 +5,11 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-pre_sale_program = "6cfTEqLuafN5gGVtqnbLwfdLJUXhqd2WnzRUMqAEej48"
+pre_sale_program = "AUAfQQmCDmzKn3hLBPPPUq5E2Z1FwY6eETkAg1qmQfEm"
 [programs.devnet]
-pre_sale_program = "6cfTEqLuafN5gGVtqnbLwfdLJUXhqd2WnzRUMqAEej48"
+pre_sale_program = "AUAfQQmCDmzKn3hLBPPPUq5E2Z1FwY6eETkAg1qmQfEm"
 [programs.mainnet]
-pre_sale_program = "6cfTEqLuafN5gGVtqnbLwfdLJUXhqd2WnzRUMqAEej48"
+pre_sale_program = "AUAfQQmCDmzKn3hLBPPPUq5E2Z1FwY6eETkAg1qmQfEm"
 
 [registry]
 url = "https://anchor.projectserum.com"

@@ -1,8 +1,8 @@
 import { Program } from "@coral-xyz/anchor";
-import { PROGRAM_ID, PROGRAM_IDL } from ".";
+import { PRE_SALE_PROGRAM, PROGRAM_IDL } from ".";
 import { getProvider } from "./provider";
 
 export const getProgram = () => {
   const provider = getProvider();
-  return new Program(PROGRAM_IDL, PROGRAM_ID, provider);
+  return new Program(PROGRAM_IDL, PRE_SALE_PROGRAM, provider);
 };

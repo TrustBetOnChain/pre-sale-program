@@ -55,7 +55,7 @@ export async function createSplToken(
   decimals: number,
   connection: Connection
 ) {
-  await createMint(
+  return createMint(
     connection,
     signer,
     signer.publicKey,

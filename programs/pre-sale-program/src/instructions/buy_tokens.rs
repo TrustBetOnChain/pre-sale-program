@@ -32,7 +32,7 @@ pub struct BuyTokens<'info> {
 
     #[account(
         mut,
-        constraint =  payer_token_account.mint ==  payer_mint.key() @ PreSaleProgramError::InvalidPayerTokenAccount,
+        constraint =  payer_token_account.mint ==  payer_mint.key() @ PreSaleProgramError::InvalidTokenAccount,
     )]
     pub payer_token_account: Account<'info, TokenAccount>,
 

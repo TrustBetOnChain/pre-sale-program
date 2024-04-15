@@ -5,7 +5,7 @@ pub enum PreSaleProgramError {
     #[msg("Vault mint is invalid")]
     InvalidVaultMint,
     #[msg("Invalid payer token account")]
-    InvalidPayerTokenAccount,
+    InvalidTokenAccount,
     #[msg("Token amount should be greater than 0")]
     InvalidTokenAmount,
     #[msg("Provided price feed account is invalid")]
@@ -16,4 +16,6 @@ pub enum PreSaleProgramError {
     InvalidChainlinkFeed,
     #[msg("Math operation overflow")]
     MathOverflow,
+    #[msg("Payer value is less than minimal")]
+    LessThanMinimalValue,
 }

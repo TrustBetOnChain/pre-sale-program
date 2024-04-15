@@ -1,18 +1,10 @@
-import {
-  workspace,
-  Program,
-  BN,
-  LangErrorCode,
-  utils,
-} from "@coral-xyz/anchor";
+import { workspace, Program, BN, LangErrorCode } from "@coral-xyz/anchor";
 
-import { PreSaleProgram } from "../target/types/pre_sale_program";
+import { IDL, PreSaleProgram } from "../target/types/pre_sale_program";
 import {
-  GetVersionedTransactionConfig,
   LAMPORTS_PER_SOL,
   PublicKey,
   Transaction,
-  VersionedTransaction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import chai from "chai";
@@ -29,35 +21,24 @@ import {
   calculateConfigSize,
   convertLamports,
 } from "../utils";
-import {
-  createAssociatedTokenAccount,
-  getAssociatedTokenAddress,
-} from "@solana/spl-token";
-import assert from "assert";
-chai.use(chaiAsPromised);
-const expect = chai.expect;
 
 import {
-  getTokenAmountInstruction,
   initializeProgramConfigInstuction,
   updateProgramConfigInstruction,
 } from "../scripts/instructions";
-import {
-  BNB_USD_FEED,
-  CHAINLINK_OFFCHAIN_PROGRAM_ID,
-  CHAINLINK_PROGRAM_ID,
-  SOL_USD_FEED,
-  SOL_USD_FEED_DEV,
-  USDC_USD_FEED_DEV,
-  USDT_ADDRESS,
-  USDT_USD_FEED,
-  WSOL_ADDRESS,
-  WSOL_DECIMALS,
-  getConnection,
-  getProvider,
-} from "../config";
+
 import { simulateTransaction } from "@coral-xyz/anchor/dist/cjs/utils/rpc";
-import { getTokenAmountView } from "../scripts/views";
+import {
+  CHAINLINK_OFFCHAIN_PROGRAM,
+  CHAINLINK_PROGRAM,
+  chainlink_price_feed,
+  getConnection,
+  tokens,
+} from "../config";
+import { getPriceFeed, getPriceFeeds } from "../config/price-feed";
+
+chai.use(chaiAsPromised);
+const expect = chai.expect;
 
 const connection = getConnection();
 
@@ -98,8 +79,8 @@ describe("pre-sale-program", () => {
     const sol_feed: Feed = await program.methods
       .getDataFeed()
       .accounts({
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
-        chainlinkFeed: SOL_USD_FEED,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+        chainlinkFeed: chainlink_price_feed["mainnet-beta"].USDT_USD,
       })
       .view();
 
@@ -110,8 +91,8 @@ describe("pre-sale-program", () => {
     const usdc_feed: Feed = await program.methods
       .getDataFeed()
       .accounts({
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
-        chainlinkFeed: SOL_USD_FEED,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+        chainlinkFeed: chainlink_price_feed["mainnet-beta"].USDC_USD,
       })
       .view();
 
@@ -121,8 +102,6 @@ describe("pre-sale-program", () => {
   });
 
   it("should be initialized!", async () => {
-    // return;
-
     const initializeProgramConfigInstruction =
       await initializeProgramConfigInstuction({
         accounts: {
@@ -131,7 +110,7 @@ describe("pre-sale-program", () => {
           vaultAccount: tokenVaultAddress,
           mint: mockMintKeypair.publicKey,
           collectedFundsAccount: mockCollectedFundsKeypair.publicKey,
-          chainlinkProgram: CHAINLINK_OFFCHAIN_PROGRAM_ID,
+          chainlinkProgram: CHAINLINK_OFFCHAIN_PROGRAM,
         },
         program,
       });
@@ -150,7 +129,7 @@ describe("pre-sale-program", () => {
       mockSignerKeypair.publicKey.toString()
     );
     expect(programConfig.chainlinkProgram.toString()).to.equal(
-      CHAINLINK_OFFCHAIN_PROGRAM_ID.toString()
+      CHAINLINK_OFFCHAIN_PROGRAM.toString()
     );
     expect(programConfig.collectedFundsAccount.toString()).to.equal(
       mockCollectedFundsKeypair.publicKey.toString()
@@ -159,8 +138,6 @@ describe("pre-sale-program", () => {
   });
 
   it("should be initialized only once!", async () => {
-    // return;
-
     const initializeProgramConfigInstruction =
       await initializeProgramConfigInstuction({
         accounts: {
@@ -169,7 +146,7 @@ describe("pre-sale-program", () => {
           vaultAccount: tokenVaultAddress,
           mint: mockMintKeypair.publicKey,
           collectedFundsAccount: mockCollectedFundsKeypair.publicKey,
-          chainlinkProgram: CHAINLINK_PROGRAM_ID,
+          chainlinkProgram: CHAINLINK_PROGRAM,
         },
         program,
       });
@@ -191,8 +168,6 @@ describe("pre-sale-program", () => {
   });
 
   it("should throw an error if not admin tries to update config", async () => {
-    // return;
-
     const instruction = await updateProgramConfigInstruction({
       accounts: {
         programConfig: programConfigAddress,
@@ -205,7 +180,7 @@ describe("pre-sale-program", () => {
         usdPrice: new BN(50),
         usdDecimals: 2,
         collectedFundsAccount: mockRandomKeypair.publicKey,
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
+        chainlinkProgram: CHAINLINK_PROGRAM,
       },
       program,
     });
@@ -228,8 +203,6 @@ describe("pre-sale-program", () => {
   });
 
   it("should only update hasPresaleEnded value", async () => {
-    // return;
-
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
@@ -272,8 +245,6 @@ describe("pre-sale-program", () => {
   });
 
   it("should only update admin value", async () => {
-    // return;
-
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
@@ -316,23 +287,11 @@ describe("pre-sale-program", () => {
   });
 
   it("should only update feeds value", async () => {
-    // return;
-
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
 
-    const usdtFeed = {
-      asset: USDT_ADDRESS,
-      dataFeed: USDT_USD_FEED,
-    };
-
-    const solFeed = {
-      asset: WSOL_ADDRESS,
-      dataFeed: SOL_USD_FEED,
-    };
-
-    const feeds = [usdtFeed, solFeed];
+    const feeds = Object.values(getPriceFeeds("mainnet-beta"));
 
     const instruction = await updateProgramConfigInstruction({
       accounts: {
@@ -375,8 +334,6 @@ describe("pre-sale-program", () => {
   });
 
   it("should only update collectedFundsAccount value", async () => {
-    // return;
-
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
@@ -445,7 +402,7 @@ describe("pre-sale-program", () => {
         usdPrice: null,
         usdDecimals: null,
         collectedFundsAccount: null,
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
+        chainlinkProgram: CHAINLINK_PROGRAM,
       },
       program,
     });
@@ -483,7 +440,7 @@ describe("pre-sale-program", () => {
     );
 
     expect(updatedProgramConfig.chainlinkProgram.toString()).to.equal(
-      CHAINLINK_PROGRAM_ID.toString()
+      CHAINLINK_PROGRAM.toString()
     );
   });
 
@@ -563,17 +520,13 @@ describe("pre-sale-program", () => {
       calculateConfigSize(programConfig.feeds.length)
     );
 
-    const usdtFeed = {
-      asset: USDT_ADDRESS,
-      dataFeed: USDT_USD_FEED,
-    };
-
-    const solFeed = {
-      asset: WSOL_ADDRESS,
-      dataFeed: SOL_USD_FEED,
-    };
-
-    const feeds = [usdtFeed, solFeed, solFeed, solFeed, solFeed];
+    const feeds = [
+      getPriceFeed("USDT", "mainnet-beta"),
+      getPriceFeed("SOL", "mainnet-beta"),
+      getPriceFeed("SOL", "mainnet-beta"),
+      getPriceFeed("SOL", "mainnet-beta"),
+      getPriceFeed("SOL", "mainnet-beta"),
+    ];
 
     const instruction = await updateProgramConfigInstruction({
       accounts: {
@@ -640,18 +593,45 @@ describe("pre-sale-program", () => {
     );
   });
 
+  it("should throw LessThanMinimalValue error", async () => {
+    const bigAmount = `${1}`;
+    const priceFeed = getPriceFeed("SOL", "mainnet-beta");
+
+    try {
+      await program.methods
+        .getTokenAmount({ amount: new BN(bigAmount) })
+        .accounts({
+          programConfig: programConfigAddress,
+          vaultMint: mockMintKeypair.publicKey,
+          chainlinkProgram: CHAINLINK_PROGRAM,
+          payerMint: priceFeed.asset,
+          chainlinkFeed: priceFeed.dataFeed,
+        })
+        .view();
+    } catch (e) {
+      expect(e.simulationResponse.err.InstructionError[1].Custom).to.equal(
+        IDL.errors[7].code
+      );
+    }
+  });
+
   it("should return price in payer's token required for token amount!", async () => {
+    const bigAmount = `${10_000_000 * 10 ** mintDecimals}`;
+
+    const priceFeed = getPriceFeed("SOL", "mainnet-beta");
+
     const value = await program.methods
-      .getTokenAmount({ amount: new BN(1700 * 10 ** mintDecimals) })
+      .getTokenAmount({ amount: new BN(bigAmount) })
       .accounts({
         programConfig: programConfigAddress,
         vaultMint: mockMintKeypair.publicKey,
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
-        payerMint: WSOL_ADDRESS,
-        chainlinkFeed: SOL_USD_FEED,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+        payerMint: priceFeed.asset,
+        chainlinkFeed: priceFeed.dataFeed,
       })
       .view();
 
+    // around 5954 with 170 USD per SOL
     console.log(value.toNumber() / LAMPORTS_PER_SOL);
   });
 

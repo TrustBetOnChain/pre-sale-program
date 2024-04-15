@@ -3,7 +3,8 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 use chainlink_solana as chainlink;
 
-use crate::{ constants, state::ProgramConfig, utils };
+use crate::{ constants, error::PreSaleProgramError, state::ProgramConfig, utils };
+use rust_decimal::prelude::ToPrimitive;
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct GetTokenAmountArgs {
@@ -29,7 +30,6 @@ pub fn get_payer_token_amount(
     ctx: Context<GetPayerTokenAmount>,
     args: GetTokenAmountArgs
 ) -> Result<u64> {
-    msg!("STAAAAAAAART {}", 1);
     let amount = args.amount;
     let payer_decimals = ctx.accounts.payer_mint.decimals;
     let usd_decimals = ctx.accounts.program_config.usd_decimals;
@@ -46,7 +46,7 @@ pub fn get_payer_token_amount(
         ctx.accounts.chainlink_feed.to_account_info()
     )?;
 
-    let payer_mint_amount = utils::convert_mint(
+    let d_payer_mint_amount = utils::convert_mint(
         amount,
         vault_mint_decimals,
         usd_price,
@@ -55,6 +55,12 @@ pub fn get_payer_token_amount(
         feed_decimals,
         payer_decimals
     );
+
+    let payer_mint_amount = d_payer_mint_amount.to_u64().unwrap();
+
+    if payer_mint_amount <= 0 {
+        return Err(PreSaleProgramError::LessThanMinimalValue.into());
+    }
 
     Ok(payer_mint_amount)
 }
