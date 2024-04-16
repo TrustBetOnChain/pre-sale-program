@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 
-export type SupportedNetwork = "mainnet-beta" | "devnet";
+export type SupportedNetwork = "mainnet-beta" | "devnet" | "testnet";
 export type SupportedToken = "SOL" | "BTC" | "ETH" | "USDC" | "USDT";
 export type SupportedPair = `${SupportedToken}_USD`;
 

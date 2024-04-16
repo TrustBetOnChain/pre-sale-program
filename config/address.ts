@@ -6,6 +6,7 @@ import {
   SupportedToken,
   SupportedTokens,
 } from "../types";
+import { mockUsdtKeypair } from "../tests/mocks";
 
 const chainlink_devnet_feed: ChainlinkFeed = {
   BTC_USD: new PublicKey("6PxBx93S8x3tno1TsFZwT5VqP8drrRCbCXygEXYNkFJe"),
@@ -26,6 +27,7 @@ const chainlink_mainnet_feed: ChainlinkFeed = {
 export const chainlink_price_feed: Record<SupportedNetwork, ChainlinkFeed> = {
   "mainnet-beta": chainlink_mainnet_feed,
   devnet: chainlink_devnet_feed,
+  testnet: chainlink_mainnet_feed,
 };
 
 export const PRE_SALE_PROGRAM = new PublicKey(
@@ -88,4 +90,11 @@ const mainnet_tokens: SupportedTokens = {
 export const tokens: Record<SupportedNetwork, SupportedTokens> = {
   ["mainnet-beta"]: mainnet_tokens,
   devnet: devnet_tokens,
+  testnet: {
+    ...mainnet_tokens,
+    USDT: {
+      pubkey: mockUsdtKeypair.publicKey,
+      decimals: 6,
+    },
+  },
 };

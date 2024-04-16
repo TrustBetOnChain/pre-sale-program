@@ -1,12 +1,21 @@
-use anchor_lang::prelude::*;
-use anchor_spl::token::{ Mint, Token, TokenAccount };
+use anchor_lang::{ prelude::*, solana_program::{ self, system_instruction } };
+use anchor_spl::token::{
+    self,
+    transfer,
+    Mint,
+    Token,
+    TokenAccount,
+    Transfer,
+    spl_token::native_mint,
+};
 
 use crate::{ constants, error::*, state::*, utils };
 use chainlink_solana as chainlink;
+use rust_decimal::prelude::ToPrimitive;
 
 #[derive(Clone, AnchorDeserialize, AnchorSerialize)]
 pub struct BuyTokensArgs {
-    pub payer_mint_amount: u64,
+    pub amount: u64,
 }
 
 #[derive(Accounts)]
@@ -15,10 +24,10 @@ pub struct BuyTokens<'info> {
     pub signer: Signer<'info>,
 
     #[account(seeds = [constants::CONFIG_SEED], bump)]
-    pub program_config: Account<'info, ProgramConfig>,
+    pub program_config: Box<Account<'info, ProgramConfig>>,
 
     #[account(mut, seeds = [constants::VAULT_SEED], bump)]
-    pub vault_account: Account<'info, TokenAccount>,
+    pub vault_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         init_if_needed,
@@ -28,19 +37,21 @@ pub struct BuyTokens<'info> {
         token::mint = vault_mint,
         token::authority = user_vault_account
     )]
-    pub user_vault_account: Account<'info, TokenAccount>,
+    pub user_vault_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         mut,
-        constraint =  payer_token_account.mint ==  payer_mint.key() @ PreSaleProgramError::InvalidTokenAccount,
+        associated_token::mint = payer_mint,
+        associated_token::authority = signer,
     )]
-    pub payer_token_account: Account<'info, TokenAccount>,
+    pub payer_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
+        mut,
         associated_token::mint = payer_mint.key(),
         associated_token::authority = program_config.collected_funds_account
     )]
-    pub collected_funds_account: Account<'info, TokenAccount>,
+    pub collected_funds_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         constraint = vault_mint.key() == vault_account.mint @ PreSaleProgramError::InvalidVaultMint,
@@ -63,43 +74,84 @@ pub struct BuyTokens<'info> {
     /// CHECK: This is the Chainlink program library
     pub chainlink_program: AccountInfo<'info>,
 
+    #[account(
+        mut,
+        constraint = collected_funds_account.key() == program_config.collected_funds_account @ PreSaleProgramError::IvalidCollectedFundsAccount
+    )]
+    /// CHECK: This account is used when transfering native SOL instead of WSOL
+    pub collected_funds_account: AccountInfo<'info>,
+
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 
 pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
-    if args.payer_mint_amount <= 0 {
-        return Err(PreSaleProgramError::InvalidTokenAmount.into());
-    }
-
-    let BuyTokens { chainlink_program, chainlink_feed, program_config, .. } = &ctx.accounts;
-    let payer_mint_amount = args.payer_mint_amount;
+    let amount = args.amount;
     let payer_decimals = ctx.accounts.payer_mint.decimals;
-    let usd_decimals = program_config.usd_decimals;
-    let usd_price = program_config.usd_price;
+    let usd_decimals = ctx.accounts.program_config.usd_decimals;
+    let usd_price = ctx.accounts.program_config.usd_price;
     let vault_mint_decimals = ctx.accounts.vault_mint.decimals;
+    let payer_token_account = &mut ctx.accounts.payer_token_account;
+    let payer_mint = &mut ctx.accounts.payer_mint;
+    let collector_token_account = &mut ctx.accounts.collected_funds_token_account;
+    let signer = &mut ctx.accounts.signer;
+    let collector_account = &mut ctx.accounts.collected_funds_account;
+    let token_program = &mut ctx.accounts.token_program;
 
     let round = chainlink::latest_round_data(
-        chainlink_program.to_account_info(),
-        chainlink_feed.to_account_info()
+        ctx.accounts.chainlink_program.to_account_info(),
+        ctx.accounts.chainlink_feed.to_account_info()
     )?;
 
     let feed_decimals = chainlink::decimals(
-        chainlink_program.to_account_info(),
-        chainlink_feed.to_account_info()
+        ctx.accounts.chainlink_program.to_account_info(),
+        ctx.accounts.chainlink_feed.to_account_info()
     )?;
 
-    // let mint_amount = utils::calculate_token_amount(
-    //     round.answer as u64,
-    //     feed_decimals,
-    //     payer_mint_amount,
-    //     payer_decimals,
-    //     usd_price,
-    //     usd_decimals,
-    //     vault_mint_decimals
-    // );
+    let d_payer_mint_amount = utils::convert_mint(
+        amount,
+        vault_mint_decimals,
+        usd_price,
+        usd_decimals,
+        round.answer as u64,
+        feed_decimals,
+        payer_decimals
+    );
 
-    // msg!("- mint_amount: {}", mint_amount);
+    let payer_mint_amount = d_payer_mint_amount.to_u64().unwrap();
+
+    if payer_mint_amount <= 0 {
+        return Err(PreSaleProgramError::LessThanMinimalValue.into());
+    }
+
+    if payer_mint.key() == native_mint::id() {
+        msg!("GO NATIVE!!!!!");
+        let transfer_instruction = system_instruction::transfer(
+            signer.key,
+            collector_account.key,
+            payer_mint_amount
+        );
+
+        anchor_lang::solana_program::program::invoke_signed(
+            &transfer_instruction,
+            &[
+                signer.to_account_info(),
+                collector_account.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[]
+        )?;
+    } else {
+        msg!("GO SPL!!!!!");
+        let cpi_accounts = Transfer {
+            from: payer_token_account.to_account_info().clone(),
+            to: collector_token_account.to_account_info().clone(),
+            authority: signer.to_account_info().clone(),
+        };
+        let cpi_program = token_program.to_account_info();
+
+        token::transfer(CpiContext::new(cpi_program, cpi_accounts), payer_mint_amount)?;
+    }
 
     Ok(())
 }

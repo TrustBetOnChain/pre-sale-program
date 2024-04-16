@@ -15,6 +15,7 @@ import { BN } from "@coral-xyz/anchor";
 import * as chainlink from "@chainlink/solana-sdk";
 import { getDataFeed } from "./get-data-feed";
 import { getPriceFeed } from "../config/price-feed";
+import { viewTokenAmount } from "./views";
 
 async function getTokenAmount() {
   const connection = await getConnection();
@@ -30,16 +31,17 @@ async function getTokenAmount() {
     program.programId
   );
 
-  const amount = await program.methods
-    .getTokenAmount({ amount: new BN(`${1000 * Math.pow(10, 6)}`) })
-    .accounts({
+  const amount = await viewTokenAmount({
+    accounts: {
       programConfig: programConfigAddress,
       vaultMint: mint.publicKey,
       chainlinkProgram: CHAINLINK_PROGRAM,
       payerMint: feed.asset,
       chainlinkFeed: feed.dataFeed,
-    })
-    .view();
+    },
+    args: { amount: new BN(`${1000 * Math.pow(10, 6)}`) },
+    program,
+  });
 
   console.log(amount.toNumber() / Math.pow(10, tokens.devnet.SOL.decimals));
 }

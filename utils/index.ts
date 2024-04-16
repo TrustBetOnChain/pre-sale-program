@@ -3,10 +3,16 @@ import {
   Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
+  Transaction,
   TransactionConfirmationStrategy,
   VersionedTransactionResponse,
+  sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import { createMint } from "@solana/spl-token";
+import {
+  createMint,
+  getMint,
+  createMintToInstruction,
+} from "@solana/spl-token";
 import { BN } from "@coral-xyz/anchor";
 import fs, { promises } from "fs";
 
@@ -63,6 +69,30 @@ export async function createSplToken(
     decimals,
     mintKeypair
   );
+}
+
+export async function mint(
+  to: PublicKey,
+  amountLamports,
+  signer: Keypair,
+  mint: PublicKey,
+  connection: Connection
+) {
+  const mintInfo = await getMint(connection, mint);
+
+  const mintToInstruction = createMintToInstruction(
+    mint,
+    to,
+    signer.publicKey,
+    amountLamports
+  );
+
+  const transaction = new Transaction().add(mintToInstruction);
+  try {
+    await sendAndConfirmTransaction(connection, transaction, [signer]);
+  } catch (e) {
+    console.log(e);
+  }
 }
 
 export function toLamports(amount: number, decimals: number): BN {
