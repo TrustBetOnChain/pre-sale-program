@@ -1,18 +1,11 @@
-import {
-  workspace,
-  Program,
-  BN,
-  LangErrorCode,
-  utils,
-} from "@coral-xyz/anchor";
+import { workspace, Program, BN, LangErrorCode } from "@coral-xyz/anchor";
 
-import { PreSaleProgram } from "../target/types/pre_sale_program";
+import { IDL, PreSaleProgram } from "../target/types/pre_sale_program";
 import {
-  GetVersionedTransactionConfig,
+  Keypair,
   LAMPORTS_PER_SOL,
   PublicKey,
   Transaction,
-  VersionedTransaction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import chai from "chai";
@@ -22,42 +15,41 @@ import {
   mockMintKeypair,
   mockRandomKeypair,
   mockSignerKeypair,
+  mockUsdtKeypair,
 } from "./mocks";
 import {
   airdrop,
   createSplToken,
   calculateConfigSize,
   convertLamports,
+  mint,
 } from "../utils";
-import {
-  createAssociatedTokenAccount,
-  getAssociatedTokenAddress,
-} from "@solana/spl-token";
-import assert from "assert";
-chai.use(chaiAsPromised);
-const expect = chai.expect;
 
 import {
-  getTokenAmountInstruction,
   initializeProgramConfigInstuction,
   updateProgramConfigInstruction,
 } from "../scripts/instructions";
-import {
-  BNB_USD_FEED,
-  CHAINLINK_OFFCHAIN_PROGRAM_ID,
-  CHAINLINK_PROGRAM_ID,
-  SOL_USD_FEED,
-  SOL_USD_FEED_DEV,
-  USDC_USD_FEED_DEV,
-  USDT_ADDRESS,
-  USDT_USD_FEED,
-  WSOL_ADDRESS,
-  WSOL_DECIMALS,
-  getConnection,
-  getProvider,
-} from "../config";
+
 import { simulateTransaction } from "@coral-xyz/anchor/dist/cjs/utils/rpc";
-import { getTokenAmountView } from "../scripts/views";
+import {
+  CHAINLINK_OFFCHAIN_PROGRAM,
+  CHAINLINK_PROGRAM,
+  chainlink_price_feed,
+  getConnection,
+  tokens,
+} from "../config";
+import { getPriceFeed, getPriceFeeds } from "../config/price-feed";
+import {
+  createAssociatedTokenAccount,
+  getAccount,
+  getAssociatedTokenAddress,
+  getOrCreateAssociatedTokenAccount,
+} from "@solana/spl-token";
+import { viewTokenAmount } from "../scripts/views";
+import { buyTokensInstruction } from "../scripts/instructions/buy-tokens";
+
+chai.use(chaiAsPromised);
+const expect = chai.expect;
 
 const connection = getConnection();
 
@@ -79,16 +71,37 @@ describe("pre-sale-program", () => {
   before(async () => {
     await airdrop(mockSignerKeypair.publicKey, 5, connection);
     await airdrop(mockRandomKeypair.publicKey, 5, connection);
-    await airdrop(mockCollectedFundsKeypair.publicKey, 5, connection);
     await createSplToken(
       mockSignerKeypair,
       mockMintKeypair,
       mintDecimals,
       connection
     );
+
+    await createSplToken(
+      mockSignerKeypair,
+      mockUsdtKeypair,
+      tokens.testnet.USDT.decimals,
+      connection
+    );
+
+    const usdtAta = await createAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      mockUsdtKeypair.publicKey,
+      mockSignerKeypair.publicKey
+    );
+
+    await mint(
+      usdtAta,
+      1005 * 10 ** tokens.testnet.USDT.decimals,
+      mockSignerKeypair,
+      mockUsdtKeypair.publicKey,
+      connection
+    );
   });
 
-  it("should return price feed!", async () => {
+  it("[getDataFeed] should return price feed!", async () => {
     interface Feed {
       decimals: number;
       description: string;
@@ -98,8 +111,8 @@ describe("pre-sale-program", () => {
     const sol_feed: Feed = await program.methods
       .getDataFeed()
       .accounts({
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
-        chainlinkFeed: SOL_USD_FEED,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+        chainlinkFeed: chainlink_price_feed["mainnet-beta"].USDT_USD,
       })
       .view();
 
@@ -110,8 +123,8 @@ describe("pre-sale-program", () => {
     const usdc_feed: Feed = await program.methods
       .getDataFeed()
       .accounts({
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
-        chainlinkFeed: SOL_USD_FEED,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+        chainlinkFeed: chainlink_price_feed["mainnet-beta"].USDC_USD,
       })
       .view();
 
@@ -120,9 +133,7 @@ describe("pre-sale-program", () => {
     // expect(usdcUsdPrice.eqn(1)).to.be.true;
   });
 
-  it("should be initialized!", async () => {
-    // return;
-
+  it("[initializeProgramConfig] should be initialized!", async () => {
     const initializeProgramConfigInstruction =
       await initializeProgramConfigInstuction({
         accounts: {
@@ -131,7 +142,7 @@ describe("pre-sale-program", () => {
           vaultAccount: tokenVaultAddress,
           mint: mockMintKeypair.publicKey,
           collectedFundsAccount: mockCollectedFundsKeypair.publicKey,
-          chainlinkProgram: CHAINLINK_OFFCHAIN_PROGRAM_ID,
+          chainlinkProgram: CHAINLINK_OFFCHAIN_PROGRAM,
         },
         program,
       });
@@ -150,7 +161,7 @@ describe("pre-sale-program", () => {
       mockSignerKeypair.publicKey.toString()
     );
     expect(programConfig.chainlinkProgram.toString()).to.equal(
-      CHAINLINK_OFFCHAIN_PROGRAM_ID.toString()
+      CHAINLINK_OFFCHAIN_PROGRAM.toString()
     );
     expect(programConfig.collectedFundsAccount.toString()).to.equal(
       mockCollectedFundsKeypair.publicKey.toString()
@@ -158,9 +169,7 @@ describe("pre-sale-program", () => {
     expect(programConfig.hasPresaleEnded).to.equal(false);
   });
 
-  it("should be initialized only once!", async () => {
-    // return;
-
+  it("[initializeProgramConfig] should be initialized only once!", async () => {
     const initializeProgramConfigInstruction =
       await initializeProgramConfigInstuction({
         accounts: {
@@ -169,7 +178,7 @@ describe("pre-sale-program", () => {
           vaultAccount: tokenVaultAddress,
           mint: mockMintKeypair.publicKey,
           collectedFundsAccount: mockCollectedFundsKeypair.publicKey,
-          chainlinkProgram: CHAINLINK_PROGRAM_ID,
+          chainlinkProgram: CHAINLINK_PROGRAM,
         },
         program,
       });
@@ -190,9 +199,7 @@ describe("pre-sale-program", () => {
     );
   });
 
-  it("should throw an error if not admin tries to update config", async () => {
-    // return;
-
+  it("[updateProgramConfig] should throw an error if not admin tries to update config", async () => {
     const instruction = await updateProgramConfigInstruction({
       accounts: {
         programConfig: programConfigAddress,
@@ -205,7 +212,7 @@ describe("pre-sale-program", () => {
         usdPrice: new BN(50),
         usdDecimals: 2,
         collectedFundsAccount: mockRandomKeypair.publicKey,
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
+        chainlinkProgram: CHAINLINK_PROGRAM,
       },
       program,
     });
@@ -213,23 +220,22 @@ describe("pre-sale-program", () => {
     const tx = new Transaction();
     tx.add(instruction);
 
-    try {
-      await sendAndConfirmTransaction(connection, tx, [mockRandomKeypair]);
-    } catch (error) {
-      const containConstraintError = error.logs.some((log) =>
-        log.includes(
-          `custom program error: 0x${LangErrorCode.ConstraintAddress.toString(
-            16
-          )}`
-        )
-      );
-      expect(containConstraintError).to.be.true;
-    }
+    await expect(sendAndConfirmTransaction(connection, tx, [mockRandomKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `custom program error: 0x${LangErrorCode.ConstraintAddress.toString(
+                16
+              )}`
+            )
+          )
+        ).to.be.true;
+      });
   });
 
-  it("should only update hasPresaleEnded value", async () => {
-    // return;
-
+  it("[updateProgramConfig] should only update hasPresaleEnded value", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
@@ -271,9 +277,7 @@ describe("pre-sale-program", () => {
     );
   });
 
-  it("should only update admin value", async () => {
-    // return;
-
+  it("[updateProgramConfig] should only update admin value", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
@@ -315,24 +319,12 @@ describe("pre-sale-program", () => {
     );
   });
 
-  it("should only update feeds value", async () => {
-    // return;
-
+  it("[updateProgramConfig] should only update feeds value", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
 
-    const usdtFeed = {
-      asset: USDT_ADDRESS,
-      dataFeed: USDT_USD_FEED,
-    };
-
-    const solFeed = {
-      asset: WSOL_ADDRESS,
-      dataFeed: SOL_USD_FEED,
-    };
-
-    const feeds = [usdtFeed, solFeed];
+    const feeds = Object.values(getPriceFeeds("mainnet-beta"));
 
     const instruction = await updateProgramConfigInstruction({
       accounts: {
@@ -374,9 +366,7 @@ describe("pre-sale-program", () => {
     );
   });
 
-  it("should only update collectedFundsAccount value", async () => {
-    // return;
-
+  it("[updateProgramConfig] should only update collectedFundsAccount value", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
@@ -426,9 +416,7 @@ describe("pre-sale-program", () => {
     );
   });
 
-  it("should only update Chainlink value", async () => {
-    // return;
-
+  it("[updateProgramConfig] should only update Chainlink value", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
@@ -445,7 +433,7 @@ describe("pre-sale-program", () => {
         usdPrice: null,
         usdDecimals: null,
         collectedFundsAccount: null,
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
+        chainlinkProgram: CHAINLINK_PROGRAM,
       },
       program,
     });
@@ -483,11 +471,11 @@ describe("pre-sale-program", () => {
     );
 
     expect(updatedProgramConfig.chainlinkProgram.toString()).to.equal(
-      CHAINLINK_PROGRAM_ID.toString()
+      CHAINLINK_PROGRAM.toString()
     );
   });
 
-  it("should only update price value", async () => {
+  it("[updateProgramConfig] should only update price value", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
@@ -549,7 +537,7 @@ describe("pre-sale-program", () => {
     );
   });
 
-  it("should allocate and reallocate right size", async () => {
+  it("[updateProgramConfig] should allocate and reallocate right size", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
@@ -563,17 +551,15 @@ describe("pre-sale-program", () => {
       calculateConfigSize(programConfig.feeds.length)
     );
 
-    const usdtFeed = {
-      asset: USDT_ADDRESS,
-      dataFeed: USDT_USD_FEED,
-    };
+    const feeds = [
+      getPriceFeed("USDT", "mainnet-beta"),
+      getPriceFeed("SOL", "mainnet-beta"),
+      getPriceFeed("SOL", "mainnet-beta"),
+      getPriceFeed("SOL", "mainnet-beta"),
+      getPriceFeed("SOL", "mainnet-beta"),
+    ];
 
-    const solFeed = {
-      asset: WSOL_ADDRESS,
-      dataFeed: SOL_USD_FEED,
-    };
-
-    const feeds = [usdtFeed, solFeed, solFeed, solFeed, solFeed];
+    feeds[0].asset = mockUsdtKeypair.publicKey;
 
     const instruction = await updateProgramConfigInstruction({
       accounts: {
@@ -640,317 +626,791 @@ describe("pre-sale-program", () => {
     );
   });
 
-  it("should return price in payer's token required for token amount!", async () => {
-    const value = await program.methods
-      .getTokenAmount({ amount: new BN(1700 * 10 ** mintDecimals) })
-      .accounts({
+  it("[getTokenAmount] should throw LessThanMinimalValue error", async () => {
+    const bigAmount = `${1}`;
+    const priceFeed = getPriceFeed("SOL", "mainnet-beta");
+
+    await expect(
+      viewTokenAmount({
+        accounts: {
+          programConfig: programConfigAddress,
+          vaultMint: mockMintKeypair.publicKey,
+          chainlinkProgram: CHAINLINK_PROGRAM,
+          payerMint: priceFeed.asset,
+          chainlinkFeed: priceFeed.dataFeed,
+        },
+        args: { amount: new BN(bigAmount) },
+        program,
+      })
+    )
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(e.simulationResponse.err.InstructionError[1].Custom).to.equal(
+          IDL.errors[6].code
+        );
+      });
+  });
+
+  it("[getTokenAmount] should return price in payer's token required for token amount!", async () => {
+    const bigAmount = `${10_000_000 * 10 ** mintDecimals}`;
+
+    const priceFeed = getPriceFeed("SOL", "mainnet-beta");
+
+    const value = await viewTokenAmount({
+      accounts: {
         programConfig: programConfigAddress,
         vaultMint: mockMintKeypair.publicKey,
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
-        payerMint: WSOL_ADDRESS,
-        chainlinkFeed: SOL_USD_FEED,
-      })
-      .view();
+        chainlinkProgram: CHAINLINK_PROGRAM,
+        payerMint: priceFeed.asset,
+        chainlinkFeed: priceFeed.dataFeed,
+      },
+      args: { amount: new BN(bigAmount) },
+      program,
+    });
 
+    // around 5954 with 170 USD per SOL
     console.log(value.toNumber() / LAMPORTS_PER_SOL);
   });
 
-  //   it("should fail when a wrong collector ATA provided", async () => {
-  //     const programConfig = await program.account.programConfig.fetch(
-  //       programConfigAddress
-  //     );
+  it("[buyTokens] should fail when a wrong collector ATA provided", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
 
-  //     const [userVaultAddress] = PublicKey.findProgramAddressSync(
-  //       [Buffer.from("user_vault"), randomKeypair.publicKey.toBuffer()],
-  //       program.programId
-  //     );
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockRandomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
 
-  //     const wsolAtaForPayment = await createAssociatedTokenAccount(
-  //       connection,
-  //       signerKeypair,
-  //       WSOL_ADDRESS,
-  //       signerKeypair.publicKey
-  //     );
+    const wsolAtaForPayment = await createAssociatedTokenAccount(
+      connection,
+      mockRandomKeypair,
+      tokens["mainnet-beta"].SOL.pubkey,
+      mockRandomKeypair.publicKey
+    );
 
-  //     const wrongAtaAuthority = collectedFundsKeypair;
+    const wrongAtaAuthority = mockSignerKeypair;
 
-  //     const wrongWsolAtaForCollecting = await createAssociatedTokenAccount(
-  //       connection,
-  //       wrongAtaAuthority,
-  //       WSOL_ADDRESS,
-  //       wrongAtaAuthority.publicKey
-  //     );
+    const wrongWsolAtaForCollecting = await createAssociatedTokenAccount(
+      connection,
+      wrongAtaAuthority,
+      tokens["mainnet-beta"].SOL.pubkey,
+      wrongAtaAuthority.publicKey
+    );
 
-  //     await expect(
-  //       program.methods
-  //         .buyTokens({ payerMintAmount: new BN(0) })
-  //         .accounts({
-  //           signer: randomKeypair.publicKey,
-  //           programConfig: programConfigAddress,
-  //           vaultAccount: tokenVaultAddress,
-  //           vaultMint: mintKeypair.publicKey,
-  //           userVaultAccount: userVaultAddress,
-  //           payerTokenAccount: wsolAtaForPayment,
-  //           collectedFundsAccount: wrongWsolAtaForCollecting,
-  //           payerMint: WSOL_ADDRESS,
-  //           chainlinkFeed: WSOL_ADDRESS,
-  //           chainlinkProgram: CHAINLINK_PROGRAM_ID,
-  //         })
-  //         .signers([randomKeypair])
-  //         .rpc()
-  //     ).to.be
-  //       .rejectedWith(`AnchorError caused by account: collected_funds_account. Error Code: ConstraintTokenOwner. Error Number: 2015. Error Message: A token owner constraint was violated.
-  // Program log: Left:
-  // Program log: ${wrongAtaAuthority.publicKey}
-  // Program log: Right:
-  // Program log: ${programConfig.collectedFundsAccount}`);
-  //   });
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockRandomKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: wsolAtaForPayment,
+        collectedFundsTokenAccount: wrongWsolAtaForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: tokens["mainnet-beta"].SOL.pubkey,
+        chainlinkFeed: tokens["mainnet-beta"].SOL.pubkey,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount: new BN(0) },
+      program,
+    });
 
-  //   it("should fail when mint doesnt exist in feeds", async () => {
-  //     const [userVaultAddress] = PublicKey.findProgramAddressSync(
-  //       [Buffer.from("user_vault"), randomKeypair.publicKey.toBuffer()],
-  //       program.programId
-  //     );
+    const tx = new Transaction();
+    tx.add(instruction);
 
-  //     const wrong_mint_address = mintKeypair.publicKey;
+    await expect(sendAndConfirmTransaction(connection, tx, [mockRandomKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) => {
+            // https://anchor.so/errors
+            return log.includes(
+              `custom program error: 0x${LangErrorCode.ConstraintTokenOwner.toString(
+                16
+              )}`
+            );
+          }) &&
+            e.logs.some((log) =>
+              log.includes(
+                "Program log: AnchorError caused by account: collected_funds_token_account. Error Code: ConstraintTokenOwner. Error Number: 2015. Error Message: A token owner constraint was violated."
+              )
+            )
+        ).to.be.true;
+      });
+  });
 
-  //     const ataForPayment = await createAssociatedTokenAccount(
-  //       connection,
-  //       signerKeypair,
-  //       wrong_mint_address,
-  //       signerKeypair.publicKey
-  //     );
+  it("[buyTokens] should fail when user vault is of another user", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
 
-  //     const ataForCollecting = await createAssociatedTokenAccount(
-  //       connection,
-  //       randomKeypair,
-  //       wrong_mint_address,
-  //       randomKeypair.publicKey
-  //     );
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockRandomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
 
-  //     await expect(
-  //       program.methods
-  //         .buyTokens({ payerMintAmount: new BN(0) })
-  //         .accounts({
-  //           signer: randomKeypair.publicKey,
-  //           programConfig: programConfigAddress,
-  //           vaultAccount: tokenVaultAddress,
-  //           vaultMint: mintKeypair.publicKey,
-  //           userVaultAccount: userVaultAddress,
-  //           payerTokenAccount: ataForPayment,
-  //           collectedFundsAccount: ataForCollecting,
-  //           payerMint: WSOL_ADDRESS,
-  //           chainlinkFeed: WSOL_ADDRESS,
-  //           chainlinkProgram: CHAINLINK_PROGRAM_ID,
-  //         })
-  //         .signers([randomKeypair])
-  //         .rpc()
-  //     ).to.be.rejectedWith(
-  //       `AnchorError caused by account: payer_token_account. Error Code: InvalidPayerTokenAccount. Error Number: 6001. Error Message: Invalid payer token account.`
-  //     );
-  //   });
+    const wrong_mint_address = mockMintKeypair.publicKey;
 
-  //   it("should fail when collector mint doesnt match payment mint", async () => {
-  //     const [userVaultAddress] = PublicKey.findProgramAddressSync(
-  //       [Buffer.from("user_vault"), randomKeypair.publicKey.toBuffer()],
-  //       program.programId
-  //     );
+    const ataForPayment = await createAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      wrong_mint_address,
+      mockSignerKeypair.publicKey
+    );
 
-  //     const wrong_mint_address = mintKeypair.publicKey;
+    const ataForCollecting = await createAssociatedTokenAccount(
+      connection,
+      mockRandomKeypair,
+      wrong_mint_address,
+      mockRandomKeypair.publicKey
+    );
 
-  //     const wsolAtaForPayment = await getAssociatedTokenAddress(
-  //       WSOL_ADDRESS,
-  //       signerKeypair.publicKey
-  //     );
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: ataForPayment,
+        collectedFundsTokenAccount: ataForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: tokens["mainnet-beta"].SOL.pubkey,
+        chainlinkFeed: tokens["mainnet-beta"].SOL.pubkey,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount: new BN(0) },
+      program,
+    });
 
-  //     const expectedAtaForCollecting = await getAssociatedTokenAddress(
-  //       WSOL_ADDRESS,
-  //       randomKeypair.publicKey
-  //     );
+    const tx = new Transaction();
+    tx.add(instruction);
 
-  //     const wrongAtaForCollecting = await getAssociatedTokenAddress(
-  //       wrong_mint_address,
-  //       randomKeypair.publicKey
-  //     );
+    await expect(sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError caused by account: user_vault_account. Error Code: ConstraintSeeds. Error Number: 2006. Error Message: A seeds constraint was violated.`
+            )
+          )
+        ).to.be.true;
+      });
+  });
 
-  //     await expect(
-  //       program.methods
-  //         .buyTokens({ payerMintAmount: new BN(0) })
-  //         .accounts({
-  //           signer: randomKeypair.publicKey,
-  //           programConfig: programConfigAddress,
-  //           vaultAccount: tokenVaultAddress,
-  //           vaultMint: mintKeypair.publicKey,
-  //           userVaultAccount: userVaultAddress,
-  //           payerTokenAccount: wsolAtaForPayment,
-  //           collectedFundsAccount: wrongAtaForCollecting,
-  //           payerMint: WSOL_ADDRESS,
-  //           chainlinkFeed: WSOL_ADDRESS,
-  //           chainlinkProgram: CHAINLINK_PROGRAM_ID,
-  //         })
-  //         .signers([randomKeypair])
-  //         .rpc()
-  //     ).to.be
-  //       .rejectedWith(`AnchorError caused by account: collected_funds_account. Error Code: ConstraintAssociated. Error Number: 2009. Error Message: An associated constraint was violated.
-  // Program log: Left:
-  // Program log: ${wrongAtaForCollecting}
-  // Program log: Right:
-  // Program log: ${expectedAtaForCollecting}`);
-  //   });
+  it("[buyTokens] should fail when token accounts mint differs from payer mint", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
 
-  //   it("should fail when vault mint is invalid", async () => {
-  //     const [userVaultAddress] = PublicKey.findProgramAddressSync(
-  //       [Buffer.from("user_vault"), randomKeypair.publicKey.toBuffer()],
-  //       program.programId
-  //     );
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
 
-  //     const wsolAtaForPayment = await getAssociatedTokenAddress(
-  //       WSOL_ADDRESS,
-  //       signerKeypair.publicKey
-  //     );
+    const wrong_mint_address = mockMintKeypair.publicKey;
 
-  //     const ataForCollecting = await createAssociatedTokenAccount(
-  //       connection,
-  //       randomKeypair,
-  //       WSOL_ADDRESS,
-  //       randomKeypair.publicKey
-  //     );
+    const ataForPayment = await getAssociatedTokenAddress(
+      wrong_mint_address,
+      mockSignerKeypair.publicKey
+    );
 
-  //     const wrongVaultMint = WSOL_ADDRESS;
+    const ataForCollecting = await getAssociatedTokenAddress(
+      wrong_mint_address,
+      mockRandomKeypair.publicKey
+    );
 
-  //     await expect(
-  //       program.methods
-  //         .buyTokens({ payerMintAmount: new BN(0) })
-  //         .accounts({
-  //           signer: randomKeypair.publicKey,
-  //           programConfig: programConfigAddress,
-  //           vaultAccount: tokenVaultAddress,
-  //           vaultMint: wrongVaultMint,
-  //           userVaultAccount: userVaultAddress,
-  //           payerTokenAccount: wsolAtaForPayment,
-  //           collectedFundsAccount: ataForCollecting,
-  //           payerMint: WSOL_ADDRESS,
-  //           chainlinkFeed: WSOL_ADDRESS,
-  //           chainlinkProgram: CHAINLINK_PROGRAM_ID,
-  //         })
-  //         .signers([randomKeypair])
-  //         .rpc()
-  //     ).to.be.rejectedWith(
-  //       `AnchorError caused by account: vault_mint. Error Code: InvalidVaultMint. Error Number: 6000. Error Message: Vault mint is invalid.`
-  //     );
-  //   });
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: ataForPayment,
+        collectedFundsTokenAccount: ataForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: tokens["mainnet-beta"].SOL.pubkey,
+        chainlinkFeed: tokens["mainnet-beta"].SOL.pubkey,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount: new BN(0) },
+      program,
+    });
 
-  //   it("should fail if amount is less or equals 0", async () => {
-  //     const [userVaultAddress] = PublicKey.findProgramAddressSync(
-  //       [Buffer.from("user_vault"), randomKeypair.publicKey.toBuffer()],
-  //       program.programId
-  //     );
+    const tx = new Transaction();
+    tx.add(instruction);
 
-  //     const wsolAtaForPayment = await getAssociatedTokenAddress(
-  //       WSOL_ADDRESS,
-  //       signerKeypair.publicKey
-  //     );
+    await expect(sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError caused by account: payer_token_account. Error Code: ConstraintAssociated. Error Number: 2009. Error Message: An associated constraint was violated.`
+            )
+          )
+        ).to.be.true;
+      });
+  });
 
-  //     const wsolAtaForCollecting = await getAssociatedTokenAddress(
-  //       WSOL_ADDRESS,
-  //       randomKeypair.publicKey
-  //     );
+  it("[buyTokens] should fail when collector mint doesnt match payment mint", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
 
-  //     await expect(
-  //       program.methods
-  //         .buyTokens({ payerMintAmount: new BN(0) })
-  //         .accounts({
-  //           signer: randomKeypair.publicKey,
-  //           programConfig: programConfigAddress,
-  //           vaultAccount: tokenVaultAddress,
-  //           vaultMint: mintKeypair.publicKey,
-  //           userVaultAccount: userVaultAddress,
-  //           payerTokenAccount: wsolAtaForPayment,
-  //           collectedFundsAccount: wsolAtaForCollecting,
-  //           payerMint: WSOL_ADDRESS,
-  //           chainlinkFeed: SOL_USD_FEED,
-  //           chainlinkProgram: CHAINLINK_PROGRAM_ID,
-  //         })
-  //         .signers([randomKeypair])
-  //         .rpc()
-  //     ).to.be.rejectedWith(
-  //       `AnchorError occurred. Error Code: InvalidTokenAmount. Error Number: 6002. Error Message: Token amount should be greater than 0.`
-  //     );
-  //   });
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
 
-  //   it("should buy tokens", async () => {
-  //     const [userVaultAddress] = PublicKey.findProgramAddressSync(
-  //       [Buffer.from("user_vault"), randomKeypair.publicKey.toBuffer()],
-  //       program.programId
-  //     );
+    const wrong_mint_address = mockMintKeypair.publicKey;
 
-  //     const ataForCollecting = await createAssociatedTokenAccount(
-  //       connection,
-  //       randomKeypair,
-  //       USDT_ADDRESS,
-  //       randomKeypair.publicKey
-  //     );
+    const wsolAtaForPayment = await getAssociatedTokenAddress(
+      tokens["mainnet-beta"].SOL.pubkey,
+      mockSignerKeypair.publicKey
+    );
 
-  //     const ataForPayment = await createAssociatedTokenAccount(
-  //       connection,
-  //       randomKeypair,
-  //       USDT_ADDRESS,
-  //       signerKeypair.publicKey
-  //     );
+    const wrongAtaForCollecting = await getAssociatedTokenAddress(
+      wrong_mint_address,
+      mockRandomKeypair.publicKey
+    );
 
-  //     // await expect(
-  //     await program.methods
-  //       .buyTokens({ payerMintAmount: new BN(1_000_000_000) })
-  //       .accounts({
-  //         signer: randomKeypair.publicKey,
-  //         programConfig: programConfigAddress,
-  //         vaultAccount: tokenVaultAddress,
-  //         vaultMint: mintKeypair.publicKey,
-  //         userVaultAccount: userVaultAddress,
-  //         payerTokenAccount: ataForPayment,
-  //         collectedFundsAccount: ataForCollecting,
-  //         payerMint: USDT_ADDRESS,
-  //         chainlinkProgram: CHAINLINK_PROGRAM_ID,
-  //         chainlinkFeed: USDT_USD_FEED,
-  //       })
-  //       .signers([randomKeypair])
-  //       .rpc();
-  //     // ).to.be.rejectedWith(
-  //     //   `AnchorError occurred. Error Code: InvalidTokenAmount. Error Number: 6001. Error Message: Token amount should be greater than 0`
-  //     // );
-  //   });
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: wsolAtaForPayment,
+        collectedFundsTokenAccount: wrongAtaForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: tokens["mainnet-beta"].SOL.pubkey,
+        chainlinkFeed: tokens["mainnet-beta"].SOL.pubkey,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount: new BN(0) },
+      program,
+    });
 
-  //   it("should buy tokens", async () => {
-  //     const [userVaultAddress] = PublicKey.findProgramAddressSync(
-  //       [Buffer.from("user_vault"), randomKeypair.publicKey.toBuffer()],
-  //       program.programId
-  //     );
+    const tx = new Transaction();
+    tx.add(instruction);
 
-  //     const wsolAtaForPayment = await getAssociatedTokenAddress(
-  //       WSOL_ADDRESS,
-  //       signerKeypair.publicKey
-  //     );
+    await expect(sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError caused by account: collected_funds_token_account. Error Code: ConstraintAssociated. Error Number: 2009. Error Message: An associated constraint was violated.`
+            )
+          )
+        ).to.be.true;
+      });
+  });
 
-  //     const wsolAtaForCollecting = await getAssociatedTokenAddress(
-  //       WSOL_ADDRESS,
-  //       randomKeypair.publicKey
-  //     );
+  it("[buyTokens] should fail when vault mint is invalid", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
 
-  //     await program.methods
-  //       .buyTokens({ payerMintAmount: new BN(1 * 10 ** (9 - 1)) })
-  //       .accounts({
-  //         signer: randomKeypair.publicKey,
-  //         programConfig: programConfigAddress,
-  //         vaultAccount: tokenVaultAddress,
-  //         vaultMint: mintKeypair.publicKey,
-  //         userVaultAccount: userVaultAddress,
-  //         payerTokenAccount: wsolAtaForPayment,
-  //         collectedFundsAccount: wsolAtaForCollecting,
-  //         chainlinkProgram: CHAINLINK_PROGRAM_ID,
-  //         payerMint: WSOL_ADDRESS,
-  //         chainlinkFeed: SOL_USD_FEED,
-  //       })
-  //       .signers([randomKeypair])
-  //       .rpc();
-  //   });
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockRandomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const wsolAtaForPayment = await getAssociatedTokenAddress(
+      tokens["mainnet-beta"].SOL.pubkey,
+      mockRandomKeypair.publicKey
+    );
+
+    const ataForCollecting = await getAssociatedTokenAddress(
+      tokens["mainnet-beta"].SOL.pubkey,
+      mockRandomKeypair.publicKey
+    );
+
+    const wrongVaultMint = tokens["mainnet-beta"].SOL.pubkey;
+
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockRandomKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: wrongVaultMint,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: wsolAtaForPayment,
+        collectedFundsTokenAccount: ataForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: tokens["mainnet-beta"].SOL.pubkey,
+        chainlinkFeed: tokens["mainnet-beta"].SOL.pubkey,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount: new BN(0) },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await expect(sendAndConfirmTransaction(connection, tx, [mockRandomKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError caused by account: vault_mint. Error Code: InvalidVaultMint. Error Number: 6000. Error Message: Vault mint is invalid.`
+            )
+          )
+        ).to.be.true;
+      });
+  });
+
+  it("[buyTokens] should fail if where were nonexistent payment mint provided", async () => {
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockRandomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const nonexistentPriceMint = "USDC";
+
+    const wsolAtaForPayment = await getAssociatedTokenAddress(
+      tokens["mainnet-beta"][nonexistentPriceMint].pubkey,
+      mockRandomKeypair.publicKey
+    );
+
+    const wsolAtaForCollecting = await createAssociatedTokenAccount(
+      connection,
+      mockRandomKeypair,
+      tokens["mainnet-beta"][nonexistentPriceMint].pubkey,
+      programConfig.collectedFundsAccount
+    );
+
+    const nonexistentPayerMint =
+      getPriceFeeds("mainnet-beta")[nonexistentPriceMint].asset;
+    const nonexistentFeedAddress =
+      getPriceFeeds("mainnet-beta")[nonexistentPriceMint].dataFeed;
+
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockRandomKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: wsolAtaForPayment,
+        collectedFundsTokenAccount: wsolAtaForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: nonexistentPayerMint,
+        chainlinkFeed: nonexistentFeedAddress,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount: new BN(0) },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await expect(sendAndConfirmTransaction(connection, tx, [mockRandomKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError caused by account: chainlink_feed. Error Code: InvalidChainlinkFeed. Error Number: 6004. Error Message: Invalid chainlink_feed account or payer_mint and chainlink_feed don't match.`
+            )
+          )
+        ).to.be.true;
+      });
+  });
+
+  it("[buyTokens] should fail if feed doesn't match", async () => {
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockRandomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const existingPriceMint = "SOL";
+
+    const wsolAtaForPayment = await getAssociatedTokenAddress(
+      tokens["mainnet-beta"][existingPriceMint].pubkey,
+      mockRandomKeypair.publicKey
+    );
+
+    const wsolAtaForCollecting = await getAssociatedTokenAddress(
+      tokens["mainnet-beta"][existingPriceMint].pubkey,
+      programConfig.collectedFundsAccount
+    );
+
+    const payerMint = getPriceFeeds("mainnet-beta")[existingPriceMint].asset;
+    const feedAddress = getPriceFeeds("mainnet-beta")["USDT"].dataFeed;
+
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockRandomKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: wsolAtaForPayment,
+        collectedFundsTokenAccount: wsolAtaForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: payerMint,
+        chainlinkFeed: feedAddress,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount: new BN(0) },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await expect(sendAndConfirmTransaction(connection, tx, [mockRandomKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError caused by account: chainlink_feed. Error Code: InvalidChainlinkFeed. Error Number: 6004. Error Message: Invalid chainlink_feed account or payer_mint and chainlink_feed don't match.`
+            )
+          )
+        ).to.be.true;
+      });
+  });
+
+  it("[buyTokens] should fail if amount of tokens user should pay is less that minimal", async () => {
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const wsolAtaForPayment = await getAssociatedTokenAddress(
+      getPriceFeeds("mainnet-beta").SOL.asset,
+      mockSignerKeypair.publicKey
+    );
+
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const wsolAtaForCollecting = await getAssociatedTokenAddress(
+      getPriceFeeds("mainnet-beta").SOL.asset,
+      programConfig.collectedFundsAccount
+    );
+
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: wsolAtaForPayment,
+        collectedFundsTokenAccount: wsolAtaForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: getPriceFeeds("mainnet-beta").SOL.asset,
+        chainlinkFeed: getPriceFeeds("mainnet-beta").SOL.dataFeed,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount: new BN(0) },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await expect(sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError occurred. Error Code: LessThanMinimalValue. Error Number: 6006. Error Message: Payer value is less than minimal.`
+            )
+          )
+        ).to.be.true;
+      });
+  });
+
+  it("before successful [buyTokens] should prepare config", async () => {
+    const updateCollectedFundsInstruction =
+      await updateProgramConfigInstruction({
+        accounts: {
+          admin: mockRandomKeypair.publicKey,
+          programConfig: programConfigAddress,
+        },
+        args: {
+          hasPresaleEnded: null,
+          admin: null,
+          feeds: null,
+          usdPrice: null,
+          usdDecimals: null,
+          collectedFundsAccount: mockCollectedFundsKeypair.publicKey,
+          chainlinkProgram: null,
+        },
+        program,
+      });
+
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(updateCollectedFundsInstruction),
+      [mockRandomKeypair]
+    );
+  });
+
+  it("[buyTokens] should throw an error is the amount of tokens to buy is bigger that treasury", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const currency = "USDT";
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const usdtAtaForPayment = await getAssociatedTokenAddress(
+      getPriceFeeds("testnet")[currency].asset,
+      mockSignerKeypair.publicKey
+    );
+
+    const usdtAtaForCollecting = await createAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      getPriceFeeds("testnet")[currency].asset,
+      programConfig.collectedFundsAccount
+    );
+
+    const amount = new BN(10_000 * 10 ** mintDecimals);
+
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: usdtAtaForPayment,
+        collectedFundsTokenAccount: usdtAtaForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: getPriceFeeds("testnet")[currency].asset,
+        chainlinkFeed: getPriceFeeds("testnet")[currency].dataFeed,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await expect(sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError occurred. Error Code: InsufficientVaultBalance. Error Number: 6008. Error Message: Amount of purchase is bigger than the amount in the treasury.`
+            )
+          )
+        ).to.be.true;
+      });
+  });
+
+  it("[buyTokens] should buy tokens with SPL", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const currency = "USDT";
+    const amount = new BN(10_000 * 10 ** mintDecimals);
+
+    const [vaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault")],
+      program.programId
+    );
+
+    const vaultBalance = (await getAccount(connection, vaultAddress)).amount;
+
+    expect(Number(vaultBalance)).to.equal(0);
+
+    await mint(
+      vaultAddress,
+      amount,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      connection
+    );
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const usdtAtaForPayment = await getAssociatedTokenAddress(
+      getPriceFeeds("testnet")[currency].asset,
+      mockSignerKeypair.publicKey
+    );
+
+    const usdtAtaForCollecting = await getAssociatedTokenAddress(
+      getPriceFeeds("testnet")[currency].asset,
+      programConfig.collectedFundsAccount
+    );
+
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: usdtAtaForPayment,
+        collectedFundsTokenAccount: usdtAtaForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: getPriceFeeds("testnet")[currency].asset,
+        chainlinkFeed: getPriceFeeds("testnet")[currency].dataFeed,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
+
+    const updatedVaultBalance = (await getAccount(connection, vaultAddress))
+      .amount;
+
+    expect(Number(updatedVaultBalance)).to.equal(0);
+
+    const userVaultBalance = (await getAccount(connection, userVaultAddress))
+      .amount;
+
+    expect(userVaultBalance.toString()).to.equal(amount.toString());
+  });
+
+  it("before successful [buyTokens] should change price to 0.2", async () => {
+    const updateCollectedFundsInstruction =
+      await updateProgramConfigInstruction({
+        accounts: {
+          admin: mockRandomKeypair.publicKey,
+          programConfig: programConfigAddress,
+        },
+        args: {
+          hasPresaleEnded: null,
+          admin: null,
+          feeds: null,
+          usdPrice: new BN(20),
+          usdDecimals: null,
+          collectedFundsAccount: null,
+          chainlinkProgram: null,
+        },
+        program,
+      });
+
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(updateCollectedFundsInstruction),
+      [mockRandomKeypair]
+    );
+  });
+
+  it("[buyTokens] should buy tokens with SOL", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const wsolAtaForPayment = await getAssociatedTokenAddress(
+      getPriceFeeds("mainnet-beta").SOL.asset,
+      mockSignerKeypair.publicKey
+    );
+
+    const wsolAtaForCollecting = await createAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      getPriceFeeds("mainnet-beta").SOL.asset,
+      programConfig.collectedFundsAccount
+    );
+
+    const tosolBalance = await connection.getBalance(
+      programConfig.collectedFundsAccount
+    );
+
+    const amount = new BN(2_000 * 10 ** mintDecimals);
+
+    const [vaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault")],
+      program.programId
+    );
+
+    const vaultBalance = (await getAccount(connection, vaultAddress)).amount;
+    const userVaultBalance = (await getAccount(connection, userVaultAddress))
+      .amount;
+
+    expect(Number(vaultBalance)).to.equal(0);
+
+    await mint(
+      vaultAddress,
+      amount,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      connection
+    );
+
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: wsolAtaForPayment,
+        collectedFundsTokenAccount: wsolAtaForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: getPriceFeeds("mainnet-beta").SOL.asset,
+        chainlinkFeed: getPriceFeeds("mainnet-beta").SOL.dataFeed,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
+
+    const updatedVaultBalance = (await getAccount(connection, vaultAddress))
+      .amount;
+
+    expect(Number(updatedVaultBalance)).to.equal(0);
+
+    const updatedUserVaultBalance = (
+      await getAccount(connection, userVaultAddress)
+    ).amount;
+
+    expect(Number(updatedUserVaultBalance) - Number(userVaultBalance)).to.equal(
+      amount.toNumber()
+    );
+  });
 });

@@ -4,24 +4,18 @@ import {
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import {
-  CHAINLINK_PROGRAM_ID,
-  SOL_USD_FEED_DEV,
-  USDC_DEV,
-  USDC_USD_FEED_DEV,
-  WSOL_DEV,
+  CHAINLINK_PROGRAM,
   getConnection,
   getProgram,
   getWallet,
-  getProvider,
-  CHAINLINK_OFFCHAIN_PROGRAM_ID,
-  USDC_USD_FEED,
-  SOL_USD_FEED,
+  tokens,
 } from "../config";
-import { initializeProgramConfigInstuction } from "./instructions";
 import { getKeypair } from "../utils";
 import { BN } from "@coral-xyz/anchor";
 import * as chainlink from "@chainlink/solana-sdk";
 import { getDataFeed } from "./get-data-feed";
+import { getPriceFeed } from "../config/price-feed";
+import { viewTokenAmount } from "./views";
 
 async function getTokenAmount() {
   const connection = await getConnection();
@@ -30,26 +24,26 @@ async function getTokenAmount() {
   const mint = getKeypair(".private/mint1.json");
   const collector = getKeypair(".private/collector1.json");
 
-  console.log(mint.publicKey);
+  const feed = getPriceFeed("SOL", "devnet");
 
   let [programConfigAddress] = PublicKey.findProgramAddressSync(
     [Buffer.from("config")],
     program.programId
   );
 
-  const amount = await program.methods
-    .getTokenAmount({ amount: new BN(1_000_000_000) })
-    .accounts({
+  const amount = await viewTokenAmount({
+    accounts: {
       programConfig: programConfigAddress,
       vaultMint: mint.publicKey,
-      chainlinkProgram: CHAINLINK_PROGRAM_ID,
-      payerMint: WSOL_DEV,
-      chainlinkFeed: SOL_USD_FEED_DEV,
-    })
-    .view();
+      chainlinkProgram: CHAINLINK_PROGRAM,
+      payerMint: feed.asset,
+      chainlinkFeed: feed.dataFeed,
+    },
+    args: { amount: new BN(`${1000 * Math.pow(10, 6)}`) },
+    program,
+  });
 
-  console.log(amount.toNumber() / Math.pow(10, 6));
+  console.log(amount.toNumber() / Math.pow(10, tokens.devnet.SOL.decimals));
 }
 
-getDataFeed().then();
 getTokenAmount().then();

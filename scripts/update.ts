@@ -3,18 +3,11 @@ import {
   Transaction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import {
-  SOL_USD_FEED_DEV,
-  USDC_DEV,
-  USDC_USD_FEED_DEV,
-  WSOL_DEV,
-  getConnection,
-  getProgram,
-  getWallet,
-} from "../config";
+import { getConnection, getProgram, getWallet } from "../config";
 import { updateProgramConfigInstruction } from "./instructions";
 import { getKeypair } from "../utils";
 import { BN } from "bn.js";
+import { getPriceFeeds } from "../config/price-feed";
 
 async function updateProgramConfig() {
   const connection = await getConnection();
@@ -41,10 +34,7 @@ async function updateProgramConfig() {
         collectedFundsAccount: null,
         usdPrice: new BN(10),
         usdDecimals: 2,
-        feeds: [
-          { dataFeed: SOL_USD_FEED_DEV, asset: WSOL_DEV },
-          { dataFeed: USDC_USD_FEED_DEV, asset: USDC_DEV },
-        ],
+        feeds: Object.values(getPriceFeeds("devnet")),
       },
       program,
     });

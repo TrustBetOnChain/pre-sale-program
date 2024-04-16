@@ -5,11 +5,11 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-pre_sale_program = "6cfTEqLuafN5gGVtqnbLwfdLJUXhqd2WnzRUMqAEej48"
+pre_sale_program = "AUAfQQmCDmzKn3hLBPPPUq5E2Z1FwY6eETkAg1qmQfEm"
 [programs.devnet]
-pre_sale_program = "6cfTEqLuafN5gGVtqnbLwfdLJUXhqd2WnzRUMqAEej48"
+pre_sale_program = "AUAfQQmCDmzKn3hLBPPPUq5E2Z1FwY6eETkAg1qmQfEm"
 [programs.mainnet]
-pre_sale_program = "6cfTEqLuafN5gGVtqnbLwfdLJUXhqd2WnzRUMqAEej48"
+pre_sale_program = "AUAfQQmCDmzKn3hLBPPPUq5E2Z1FwY6eETkAg1qmQfEm"
 
 [registry]
 url = "https://anchor.projectserum.com"
@@ -46,3 +46,9 @@ address = "716hFAECqotxcXcj8Hs8nr7AG6q9dBw2oX3k3M8V7uGq" #chainlink ETH / USD Pr
 address = "Cv4T27XbjVoKUYwP72NQQanvZeA7W4YF9L4EnYT9kx5o" #chainlink BTC / USD Price feed
 [[test.validator.clone]]
 address = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB" #USDT
+[[test.validator.clone]]
+address = "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh" #BTC
+[[test.validator.clone]]
+address = "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs" #ETH
+[[test.validator.clone]]
+address = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" #USDC

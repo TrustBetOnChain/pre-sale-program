@@ -2,9 +2,15 @@ import { PublicKey } from "@solana/web3.js";
 import { PreSaleProgram } from "../../target/types/pre_sale_program";
 import { BN, Program } from "@coral-xyz/anchor";
 
-type getTokenAmountArgs = {
+type BuyTokensArgs = {
   args: { amount: BN };
   accounts: {
+    signer: PublicKey;
+    vaultAccount: PublicKey;
+    userVaultAccount: PublicKey;
+    payerTokenAccount: PublicKey;
+    collectedFundsTokenAccount: PublicKey;
+    collectedFundsAccount: PublicKey;
     programConfig: PublicKey;
     vaultMint: PublicKey;
     chainlinkProgram: PublicKey;
@@ -14,10 +20,10 @@ type getTokenAmountArgs = {
   program: Program<PreSaleProgram>;
 };
 
-export function viewTokenAmount({
+export function buyTokensInstruction({
   accounts,
   program,
   args,
-}: getTokenAmountArgs): Promise<BN> {
-  return program.methods.getTokenAmount(args).accounts(accounts).view();
+}: BuyTokensArgs) {
+  return program.methods.buyTokens(args).accounts(accounts).instruction();
 }

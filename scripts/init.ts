@@ -4,7 +4,7 @@ import {
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import {
-  CHAINLINK_PROGRAM_ID,
+  CHAINLINK_PROGRAM,
   getConnection,
   getProgram,
   getWallet,
@@ -37,7 +37,7 @@ async function init() {
         vaultAccount: tokenVaultAddress,
         mint: mint.publicKey,
         collectedFundsAccount: collector.publicKey,
-        chainlinkProgram: CHAINLINK_PROGRAM_ID,
+        chainlinkProgram: CHAINLINK_PROGRAM,
       },
       program,
     });
