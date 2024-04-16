@@ -1270,6 +1270,12 @@ describe("pre-sale-program", () => {
       programConfig.collectedFundsAccount
     );
 
+    const collectedFundsUsdtBalance = (
+      await getAccount(connection, usdtAtaForCollecting)
+    ).amount;
+
+    expect(Number(collectedFundsUsdtBalance)).to.equal(0);
+
     const instruction = await buyTokensInstruction({
       accounts: {
         signer: mockSignerKeypair.publicKey,
@@ -1291,7 +1297,11 @@ describe("pre-sale-program", () => {
     const tx = new Transaction();
     tx.add(instruction);
 
-    await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
+    try {
+      await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
+    } catch (e) {
+      console.log(e);
+    }
 
     const updatedVaultBalance = (await getAccount(connection, vaultAddress))
       .amount;
@@ -1302,6 +1312,12 @@ describe("pre-sale-program", () => {
       .amount;
 
     expect(userVaultBalance.toString()).to.equal(amount.toString());
+
+    const updatedCollectedFundsUsdtBalance = (
+      await getAccount(connection, usdtAtaForCollecting)
+    ).amount;
+
+    expect(Number(updatedCollectedFundsUsdtBalance)).to.not.equal(0);
   });
 
   it("before successful [buyTokens] should change price to 0.2", async () => {
@@ -1352,9 +1368,11 @@ describe("pre-sale-program", () => {
       programConfig.collectedFundsAccount
     );
 
-    const tosolBalance = await connection.getBalance(
+    const collectedFundsBalance = await connection.getBalance(
       programConfig.collectedFundsAccount
     );
+
+    expect(Number(collectedFundsBalance)).to.equal(0);
 
     const amount = new BN(2_000 * 10 ** mintDecimals);
 
@@ -1399,6 +1417,12 @@ describe("pre-sale-program", () => {
     tx.add(instruction);
 
     await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
+
+    const updatedCollectedFundsBalance = await connection.getBalance(
+      programConfig.collectedFundsAccount
+    );
+
+    expect(Number(updatedCollectedFundsBalance)).to.not.equal(0);
 
     const updatedVaultBalance = (await getAccount(connection, vaultAddress))
       .amount;

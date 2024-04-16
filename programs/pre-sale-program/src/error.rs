@@ -20,4 +20,6 @@ pub enum PreSaleProgramError {
     IvalidCollectedFundsAccount,
     #[msg("Amount of purchase is bigger than the amount in the treasury")]
     InsufficientVaultBalance,
+    #[msg("Error occurred while converting mints")]
+    ConversionError,
 }
