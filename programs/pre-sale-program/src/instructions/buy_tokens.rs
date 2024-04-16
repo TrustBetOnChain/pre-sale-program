@@ -97,6 +97,12 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
     let signer = &mut ctx.accounts.signer;
     let collector_account = &mut ctx.accounts.collected_funds_account;
     let token_program = &mut ctx.accounts.token_program;
+    let vault_account: &Box<Account<'_, TokenAccount>> = &ctx.accounts.vault_account;
+    let user_vault_account = &ctx.accounts.user_vault_account;
+
+    if amount > vault_account.amount {
+        return Err(PreSaleProgramError::InsufficientVaultBalance.into());
+    }
 
     let round = chainlink::latest_round_data(
         ctx.accounts.chainlink_program.to_account_info(),
@@ -125,7 +131,6 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
     }
 
     if payer_mint.key() == native_mint::id() {
-        msg!("GO NATIVE!!!!!");
         let transfer_instruction = system_instruction::transfer(
             signer.key,
             collector_account.key,
@@ -142,7 +147,6 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
             &[]
         )?;
     } else {
-        msg!("GO SPL!!!!!");
         let cpi_accounts = Transfer {
             from: payer_token_account.to_account_info().clone(),
             to: collector_token_account.to_account_info().clone(),
@@ -152,6 +156,18 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
 
         token::transfer(CpiContext::new(cpi_program, cpi_accounts), payer_mint_amount)?;
     }
+
+    let bump = ctx.bumps.vault_account;
+    let signer: &[&[&[u8]]] = &[&[constants::VAULT_SEED, &[bump]]];
+
+    let cpi_accounts = Transfer {
+        from: vault_account.to_account_info().clone(),
+        to: user_vault_account.to_account_info().clone(),
+        authority: vault_account.to_account_info().clone(),
+    };
+    let cpi_program = token_program.to_account_info();
+
+    token::transfer(CpiContext::new_with_signer(cpi_program, cpi_accounts, signer), amount)?;
 
     Ok(())
 }

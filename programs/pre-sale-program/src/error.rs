@@ -18,4 +18,6 @@ pub enum PreSaleProgramError {
     LessThanMinimalValue,
     #[msg("Collected funds account invalid")]
     IvalidCollectedFundsAccount,
+    #[msg("Amount of purchase is bigger than the amount in the treasury")]
+    InsufficientVaultBalance,
 }

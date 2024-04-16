@@ -1170,6 +1170,166 @@ describe("pre-sale-program", () => {
     );
   });
 
+  it("[buyTokens] should throw an error is the amount of tokens to buy is bigger that treasury", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const currency = "USDT";
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const usdtAtaForPayment = await getAssociatedTokenAddress(
+      getPriceFeeds("testnet")[currency].asset,
+      mockSignerKeypair.publicKey
+    );
+
+    const usdtAtaForCollecting = await createAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      getPriceFeeds("testnet")[currency].asset,
+      programConfig.collectedFundsAccount
+    );
+
+    const amount = new BN(10_000 * 10 ** mintDecimals);
+
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: usdtAtaForPayment,
+        collectedFundsTokenAccount: usdtAtaForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: getPriceFeeds("testnet")[currency].asset,
+        chainlinkFeed: getPriceFeeds("testnet")[currency].dataFeed,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await expect(sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError occurred. Error Code: InsufficientVaultBalance. Error Number: 6008. Error Message: Amount of purchase is bigger than the amount in the treasury.`
+            )
+          )
+        ).to.be.true;
+      });
+  });
+
+  it("[buyTokens] should buy tokens with SPL", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const currency = "USDT";
+    const amount = new BN(10_000 * 10 ** mintDecimals);
+
+    const [vaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault")],
+      program.programId
+    );
+
+    const vaultBalance = (await getAccount(connection, vaultAddress)).amount;
+
+    expect(Number(vaultBalance)).to.equal(0);
+
+    await mint(
+      vaultAddress,
+      amount,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      connection
+    );
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const usdtAtaForPayment = await getAssociatedTokenAddress(
+      getPriceFeeds("testnet")[currency].asset,
+      mockSignerKeypair.publicKey
+    );
+
+    const usdtAtaForCollecting = await getAssociatedTokenAddress(
+      getPriceFeeds("testnet")[currency].asset,
+      programConfig.collectedFundsAccount
+    );
+
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        payerTokenAccount: usdtAtaForPayment,
+        collectedFundsTokenAccount: usdtAtaForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: getPriceFeeds("testnet")[currency].asset,
+        chainlinkFeed: getPriceFeeds("testnet")[currency].dataFeed,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
+
+    const updatedVaultBalance = (await getAccount(connection, vaultAddress))
+      .amount;
+
+    expect(Number(updatedVaultBalance)).to.equal(0);
+
+    const userVaultBalance = (await getAccount(connection, userVaultAddress))
+      .amount;
+
+    expect(userVaultBalance.toString()).to.equal(amount.toString());
+  });
+
+  it("before successful [buyTokens] should change price to 0.2", async () => {
+    const updateCollectedFundsInstruction =
+      await updateProgramConfigInstruction({
+        accounts: {
+          admin: mockRandomKeypair.publicKey,
+          programConfig: programConfigAddress,
+        },
+        args: {
+          hasPresaleEnded: null,
+          admin: null,
+          feeds: null,
+          usdPrice: new BN(20),
+          usdDecimals: null,
+          collectedFundsAccount: null,
+          chainlinkProgram: null,
+        },
+        program,
+      });
+
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(updateCollectedFundsInstruction),
+      [mockRandomKeypair]
+    );
+  });
+
   it("[buyTokens] should buy tokens with SOL", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
@@ -1196,7 +1356,26 @@ describe("pre-sale-program", () => {
       programConfig.collectedFundsAccount
     );
 
-    const amount = new BN(1_000 * 10 ** mintDecimals);
+    const amount = new BN(2_000 * 10 ** mintDecimals);
+
+    const [vaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault")],
+      program.programId
+    );
+
+    const vaultBalance = (await getAccount(connection, vaultAddress)).amount;
+    const userVaultBalance = (await getAccount(connection, userVaultAddress))
+      .amount;
+
+    expect(Number(vaultBalance)).to.equal(0);
+
+    await mint(
+      vaultAddress,
+      amount,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      connection
+    );
 
     const instruction = await buyTokensInstruction({
       accounts: {
@@ -1221,84 +1400,17 @@ describe("pre-sale-program", () => {
 
     await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
 
-    const tosolBalanceUpdated = await connection.getBalance(
-      programConfig.collectedFundsAccount
-    );
-    console.log(
-      `TO: SOL updated balance: ${tosolBalanceUpdated / LAMPORTS_PER_SOL} SOL`
-    );
-  });
+    const updatedVaultBalance = (await getAccount(connection, vaultAddress))
+      .amount;
 
-  it("[buyTokens] should buy tokens with SPL", async () => {
-    const programConfig = await program.account.programConfig.fetch(
-      programConfigAddress
-    );
+    expect(Number(updatedVaultBalance)).to.equal(0);
 
-    const currency = "USDT";
+    const updatedUserVaultBalance = (
+      await getAccount(connection, userVaultAddress)
+    ).amount;
 
-    const [userVaultAddress] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
-      program.programId
-    );
-
-    const usdtAtaForPayment = await getAssociatedTokenAddress(
-      getPriceFeeds("testnet")[currency].asset,
-      mockSignerKeypair.publicKey
-    );
-
-    const usdtAtaForCollecting = await createAssociatedTokenAccount(
-      connection,
-      mockSignerKeypair,
-      getPriceFeeds("testnet")[currency].asset,
-      programConfig.collectedFundsAccount
-    );
-
-    const amount = new BN(10_000 * 10 ** mintDecimals);
-
-    console.log(
-      "USDT P  BALANCE:",
-      (await getAccount(connection, usdtAtaForPayment)).amount
-    );
-
-    const instruction = await buyTokensInstruction({
-      accounts: {
-        signer: mockSignerKeypair.publicKey,
-        programConfig: programConfigAddress,
-        vaultAccount: tokenVaultAddress,
-        vaultMint: mockMintKeypair.publicKey,
-        userVaultAccount: userVaultAddress,
-        payerTokenAccount: usdtAtaForPayment,
-        collectedFundsTokenAccount: usdtAtaForCollecting,
-        collectedFundsAccount: programConfig.collectedFundsAccount,
-        payerMint: getPriceFeeds("testnet")[currency].asset,
-        chainlinkFeed: getPriceFeeds("testnet")[currency].dataFeed,
-        chainlinkProgram: CHAINLINK_PROGRAM,
-      },
-      args: { amount },
-      program,
-    });
-
-    const tx = new Transaction();
-    tx.add(instruction);
-
-    try {
-      await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
-    } catch (e) {
-      console.log(e);
-    }
-
-    console.log(
-      (await getAccount(connection, usdtAtaForPayment)).amount +
-        (await getAccount(connection, usdtAtaForCollecting)).amount
-    );
-
-    console.log(
-      "USDT P updated BALANCE:",
-      (await getAccount(connection, usdtAtaForPayment)).amount
-    );
-    console.log(
-      "USDT C updated BALANCE:",
-      (await getAccount(connection, usdtAtaForCollecting)).amount
+    expect(Number(updatedUserVaultBalance) - Number(userVaultBalance)).to.equal(
+      amount.toNumber()
     );
   });
 });
