@@ -32,9 +32,13 @@ async function updateProgramConfig() {
         admin: null,
         chainlinkProgram: null,
         collectedFundsAccount: null,
-        usdPrice: new BN(10),
+        // collectedFundsAccount: new PublicKey(
+        //   "9StLPqawgBnTXVUkJ5eDCVj2Nnsdjuz2is9cAkKGQJqM"
+        // ),
+        usdPrice: new BN(20),
         usdDecimals: 2,
-        feeds: Object.values(getPriceFeeds("devnet")),
+        feeds: null,
+        // feeds: Object.values(getPriceFeeds("devnet")),
       },
       program,
     });

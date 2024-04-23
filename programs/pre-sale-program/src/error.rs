@@ -22,4 +22,6 @@ pub enum PreSaleProgramError {
     InsufficientVaultBalance,
     #[msg("Error occurred while converting mints")]
     ConversionError,
+    #[msg("Pre-sale campaign has not ended")]
+    PreSaleStillOn,
 }

@@ -47,6 +47,14 @@ pub mod pre_sale_program {
         instructions::buy_tokens(ctx, args)
     }
 
+    pub fn claim_tokens(ctx: Context<ClaimTokens>) -> Result<()> {
+        instructions::claim_tokens(ctx)
+    }
+
+    pub fn withdraw_tokens(ctx: Context<WithdrawTokens>) -> Result<()> {
+        instructions::withdraw_tokens(ctx)
+    }
+
     pub fn get_data_feed(ctx: Context<GetDataFeed>) -> Result<DataFeed> {
         instructions::get_data_feed(ctx)
     }
