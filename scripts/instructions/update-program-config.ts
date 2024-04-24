@@ -15,6 +15,7 @@ type UpdateProgramConfigAgrs = {
     collectedFundsAccount: PublicKey | null;
     usdPrice: BN | null;
     usdDecimals: number | null;
+    availablePercentage: BN | null;
     feeds: PriceFeedInfo[] | null;
   };
   accounts: {

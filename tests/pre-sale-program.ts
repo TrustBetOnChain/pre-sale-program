@@ -213,6 +213,7 @@ describe("pre-sale-program", () => {
         admin: mockRandomKeypair.publicKey,
         feeds: [],
         usdPrice: new BN(50),
+        availablePercentage: null,
         usdDecimals: 2,
         collectedFundsAccount: mockRandomKeypair.publicKey,
         chainlinkProgram: CHAINLINK_PROGRAM,
@@ -253,6 +254,7 @@ describe("pre-sale-program", () => {
         admin: null,
         feeds: null,
         usdPrice: null,
+        availablePercentage: null,
         usdDecimals: null,
         collectedFundsAccount: null,
         chainlinkProgram: null,
@@ -294,6 +296,7 @@ describe("pre-sale-program", () => {
         hasPresaleEnded: null,
         admin: mockRandomKeypair.publicKey,
         feeds: null,
+        availablePercentage: null,
         usdPrice: null,
         usdDecimals: null,
         collectedFundsAccount: null,
@@ -339,6 +342,7 @@ describe("pre-sale-program", () => {
         admin: null,
         feeds,
         usdPrice: null,
+        availablePercentage: null,
         usdDecimals: null,
         collectedFundsAccount: null,
         chainlinkProgram: null,
@@ -369,6 +373,59 @@ describe("pre-sale-program", () => {
     );
   });
 
+  it("[updateProgramConfig] should update available percentage value", async () => {
+    const value = new BN(20);
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    expect(programConfig.availablePercentage.toString()).to.equal(
+      new BN(0).toString()
+    );
+
+    const instruction = await updateProgramConfigInstruction({
+      accounts: {
+        programConfig: programConfigAddress,
+        admin: mockRandomKeypair.publicKey,
+      },
+      args: {
+        hasPresaleEnded: null,
+        admin: null,
+        feeds: null,
+        usdPrice: null,
+        usdDecimals: null,
+        collectedFundsAccount: null,
+        chainlinkProgram: null,
+        availablePercentage: value,
+      },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await sendAndConfirmTransaction(connection, tx, [mockRandomKeypair]);
+
+    const updatedProgramConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    expect(programConfig.admin.toString()).to.equal(
+      updatedProgramConfig.admin.toString()
+    );
+    expect(programConfig.hasPresaleEnded).to.equal(
+      updatedProgramConfig.hasPresaleEnded
+    );
+
+    expect(updatedProgramConfig.availablePercentage.toString()).to.equal(
+      value.toString()
+    );
+
+    expect(programConfig.availablePercentage.toString()).to.not.equal(
+      updatedProgramConfig.availablePercentage.toString()
+    );
+  });
+
   it("[updateProgramConfig] should only update collectedFundsAccount value", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
@@ -389,6 +446,7 @@ describe("pre-sale-program", () => {
         feeds: null,
         usdPrice: null,
         usdDecimals: null,
+        availablePercentage: null,
         collectedFundsAccount: mockRandomKeypair.publicKey,
         chainlinkProgram: null,
       },
@@ -437,6 +495,7 @@ describe("pre-sale-program", () => {
         usdDecimals: null,
         collectedFundsAccount: null,
         chainlinkProgram: CHAINLINK_PROGRAM,
+        availablePercentage: null,
       },
       program,
     });
@@ -494,6 +553,7 @@ describe("pre-sale-program", () => {
       args: {
         hasPresaleEnded: null,
         admin: null,
+        availablePercentage: null,
         feeds: null,
         usdPrice: new BN(usdPrice * 10 ** usdDecimals),
         usdDecimals,
@@ -575,6 +635,7 @@ describe("pre-sale-program", () => {
         feeds,
         usdPrice: null,
         usdDecimals: null,
+        availablePercentage: null,
         collectedFundsAccount: null,
         chainlinkProgram: null,
       },
@@ -604,6 +665,7 @@ describe("pre-sale-program", () => {
         hasPresaleEnded: null,
         admin: null,
         feeds: null,
+        availablePercentage: null,
         usdPrice: null,
         usdDecimals: null,
         collectedFundsAccount: null,
@@ -675,6 +737,33 @@ describe("pre-sale-program", () => {
     // console.log(value.toNumber() / LAMPORTS_PER_SOL);
   });
 
+  it("before [buyTokens] setting PRE SALE to ON", async () => {
+    const updateCollectedFundsInstruction =
+      await updateProgramConfigInstruction({
+        accounts: {
+          admin: mockRandomKeypair.publicKey,
+          programConfig: programConfigAddress,
+        },
+        args: {
+          hasPresaleEnded: false,
+          admin: null,
+          feeds: null,
+          usdPrice: null,
+          availablePercentage: null,
+          usdDecimals: null,
+          collectedFundsAccount: null,
+          chainlinkProgram: null,
+        },
+        program,
+      });
+
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(updateCollectedFundsInstruction),
+      [mockRandomKeypair]
+    );
+  });
+
   it("[buyTokens] should fail when a wrong collector ATA provided", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
@@ -682,6 +771,11 @@ describe("pre-sale-program", () => {
 
     const [userVaultAddress] = PublicKey.findProgramAddressSync(
       [Buffer.from("user_vault"), mockRandomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockRandomKeypair.publicKey.toBuffer()],
       program.programId
     );
 
@@ -708,6 +802,7 @@ describe("pre-sale-program", () => {
         vaultAccount: tokenVaultAddress,
         vaultMint: mockMintKeypair.publicKey,
         userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
         payerTokenAccount: wsolAtaForPayment,
         collectedFundsTokenAccount: wrongWsolAtaForCollecting,
         collectedFundsAccount: programConfig.collectedFundsAccount,
@@ -753,6 +848,11 @@ describe("pre-sale-program", () => {
       program.programId
     );
 
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
     const wrong_mint_address = mockMintKeypair.publicKey;
 
     const ataForPayment = await createAssociatedTokenAccount(
@@ -776,6 +876,7 @@ describe("pre-sale-program", () => {
         vaultAccount: tokenVaultAddress,
         vaultMint: mockMintKeypair.publicKey,
         userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
         payerTokenAccount: ataForPayment,
         collectedFundsTokenAccount: ataForCollecting,
         collectedFundsAccount: programConfig.collectedFundsAccount,
@@ -813,6 +914,11 @@ describe("pre-sale-program", () => {
       program.programId
     );
 
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
     const wrong_mint_address = mockMintKeypair.publicKey;
 
     const ataForPayment = await getAssociatedTokenAddress(
@@ -832,6 +938,7 @@ describe("pre-sale-program", () => {
         vaultAccount: tokenVaultAddress,
         vaultMint: mockMintKeypair.publicKey,
         userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
         payerTokenAccount: ataForPayment,
         collectedFundsTokenAccount: ataForCollecting,
         collectedFundsAccount: programConfig.collectedFundsAccount,
@@ -869,6 +976,11 @@ describe("pre-sale-program", () => {
       program.programId
     );
 
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
     const wrong_mint_address = mockMintKeypair.publicKey;
 
     const wsolAtaForPayment = await getAssociatedTokenAddress(
@@ -888,6 +1000,7 @@ describe("pre-sale-program", () => {
         vaultAccount: tokenVaultAddress,
         vaultMint: mockMintKeypair.publicKey,
         userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
         payerTokenAccount: wsolAtaForPayment,
         collectedFundsTokenAccount: wrongAtaForCollecting,
         collectedFundsAccount: programConfig.collectedFundsAccount,
@@ -925,6 +1038,11 @@ describe("pre-sale-program", () => {
       program.programId
     );
 
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockRandomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
     const wsolAtaForPayment = await getAssociatedTokenAddress(
       tokens["mainnet-beta"].SOL.pubkey,
       mockRandomKeypair.publicKey
@@ -944,6 +1062,7 @@ describe("pre-sale-program", () => {
         vaultAccount: tokenVaultAddress,
         vaultMint: wrongVaultMint,
         userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
         payerTokenAccount: wsolAtaForPayment,
         collectedFundsTokenAccount: ataForCollecting,
         collectedFundsAccount: programConfig.collectedFundsAccount,
@@ -977,6 +1096,11 @@ describe("pre-sale-program", () => {
       program.programId
     );
 
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockRandomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
@@ -1007,6 +1131,7 @@ describe("pre-sale-program", () => {
         vaultAccount: tokenVaultAddress,
         vaultMint: mockMintKeypair.publicKey,
         userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
         payerTokenAccount: wsolAtaForPayment,
         collectedFundsTokenAccount: wsolAtaForCollecting,
         collectedFundsAccount: programConfig.collectedFundsAccount,
@@ -1040,6 +1165,11 @@ describe("pre-sale-program", () => {
       program.programId
     );
 
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockRandomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
@@ -1066,6 +1196,7 @@ describe("pre-sale-program", () => {
         vaultAccount: tokenVaultAddress,
         vaultMint: mockMintKeypair.publicKey,
         userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
         payerTokenAccount: wsolAtaForPayment,
         collectedFundsTokenAccount: wsolAtaForCollecting,
         collectedFundsAccount: programConfig.collectedFundsAccount,
@@ -1099,6 +1230,11 @@ describe("pre-sale-program", () => {
       program.programId
     );
 
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
     const wsolAtaForPayment = await getAssociatedTokenAddress(
       getPriceFeeds("mainnet-beta").SOL.asset,
       mockSignerKeypair.publicKey
@@ -1120,6 +1256,7 @@ describe("pre-sale-program", () => {
         vaultAccount: tokenVaultAddress,
         vaultMint: mockMintKeypair.publicKey,
         userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
         payerTokenAccount: wsolAtaForPayment,
         collectedFundsTokenAccount: wsolAtaForCollecting,
         collectedFundsAccount: programConfig.collectedFundsAccount,
@@ -1160,6 +1297,7 @@ describe("pre-sale-program", () => {
           feeds: null,
           usdPrice: null,
           usdDecimals: null,
+          availablePercentage: null,
           collectedFundsAccount: mockCollectedFundsKeypair.publicKey,
           chainlinkProgram: null,
         },
@@ -1185,6 +1323,11 @@ describe("pre-sale-program", () => {
       program.programId
     );
 
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
     const usdtAtaForPayment = await getAssociatedTokenAddress(
       getPriceFeeds("testnet")[currency].asset,
       mockSignerKeypair.publicKey
@@ -1206,6 +1349,7 @@ describe("pre-sale-program", () => {
         vaultAccount: tokenVaultAddress,
         vaultMint: mockMintKeypair.publicKey,
         userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
         payerTokenAccount: usdtAtaForPayment,
         collectedFundsTokenAccount: usdtAtaForCollecting,
         collectedFundsAccount: programConfig.collectedFundsAccount,
@@ -1263,6 +1407,11 @@ describe("pre-sale-program", () => {
       program.programId
     );
 
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
     const usdtAtaForPayment = await getAssociatedTokenAddress(
       getPriceFeeds("testnet")[currency].asset,
       mockSignerKeypair.publicKey
@@ -1285,6 +1434,7 @@ describe("pre-sale-program", () => {
         programConfig: programConfigAddress,
         vaultAccount: tokenVaultAddress,
         vaultMint: mockMintKeypair.publicKey,
+        userInfoAccount: userInfoAddress,
         userVaultAccount: userVaultAddress,
         payerTokenAccount: usdtAtaForPayment,
         collectedFundsTokenAccount: usdtAtaForCollecting,
@@ -1300,11 +1450,7 @@ describe("pre-sale-program", () => {
     const tx = new Transaction();
     tx.add(instruction);
 
-    try {
-      await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
-    } catch (e) {
-      console.log(e);
-    }
+    await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
 
     const updatedVaultBalance = (await getAccount(connection, vaultAddress))
       .amount;
@@ -1321,6 +1467,10 @@ describe("pre-sale-program", () => {
     ).amount;
 
     expect(Number(updatedCollectedFundsUsdtBalance)).to.not.equal(0);
+
+    const userInfo = await program.account.userInfo.fetch(userInfoAddress);
+
+    expect(userInfo.stake.toString()).to.equal(amount.toString());
   });
 
   it("before successful [buyTokens] should change price to 0.2", async () => {
@@ -1338,6 +1488,7 @@ describe("pre-sale-program", () => {
           usdDecimals: null,
           collectedFundsAccount: null,
           chainlinkProgram: null,
+          availablePercentage: null,
         },
         program,
       });
@@ -1358,6 +1509,13 @@ describe("pre-sale-program", () => {
       [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
       program.programId
     );
+
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const userInfo = await program.account.userInfo.fetch(userInfoAddress);
 
     const wsolAtaForPayment = await getAssociatedTokenAddress(
       getPriceFeeds("mainnet-beta").SOL.asset,
@@ -1386,7 +1544,11 @@ describe("pre-sale-program", () => {
     const userVaultBalance = (await getAccount(connection, userVaultAddress))
       .amount;
 
+    const userStake = new BN(10_000 * 10 ** mintDecimals);
+
     expect(Number(vaultBalance)).to.equal(0);
+    expect(userVaultBalance.toString()).to.equal(userStake.toString());
+    expect(userInfo.stake.toString()).to.equal(userStake.toString());
 
     const amount = new BN(2_000 * 10 ** mintDecimals);
 
@@ -1405,6 +1567,7 @@ describe("pre-sale-program", () => {
         vaultAccount: tokenVaultAddress,
         vaultMint: mockMintKeypair.publicKey,
         userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
         payerTokenAccount: wsolAtaForPayment,
         collectedFundsTokenAccount: wsolAtaForCollecting,
         collectedFundsAccount: programConfig.collectedFundsAccount,
@@ -1439,81 +1602,17 @@ describe("pre-sale-program", () => {
     expect(Number(updatedUserVaultBalance) - Number(userVaultBalance)).to.equal(
       amount.toNumber()
     );
-  });
 
-  it("before [claimTokens] we set pre-sale to ON", async () => {
-    const updateCollectedFundsInstruction =
-      await updateProgramConfigInstruction({
-        accounts: {
-          admin: mockRandomKeypair.publicKey,
-          programConfig: programConfigAddress,
-        },
-        args: {
-          hasPresaleEnded: false,
-          admin: null,
-          feeds: null,
-          usdPrice: null,
-          usdDecimals: null,
-          collectedFundsAccount: null,
-          chainlinkProgram: null,
-        },
-        program,
-      });
+    const updatedUserInfo = await program.account.userInfo.fetch(
+      userInfoAddress
+    );
 
-    await sendAndConfirmTransaction(
-      connection,
-      new Transaction().add(updateCollectedFundsInstruction),
-      [mockRandomKeypair]
+    expect(Number(updatedUserInfo.stake) - Number(userInfo.stake)).to.equal(
+      amount.toNumber()
     );
   });
 
-  it("[claimTokens] should throw an error is pre-sale has not ended", async () => {
-    const programConfig = await program.account.programConfig.fetch(
-      programConfigAddress
-    );
-
-    expect(programConfig.hasPresaleEnded).to.be.false;
-
-    const [userVaultAddress] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
-      program.programId
-    );
-
-    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
-      mockSignerKeypair,
-      mockMintKeypair.publicKey,
-      mockSignerKeypair.publicKey
-    );
-
-    const instruction = await claimTokensInstruction({
-      accounts: {
-        signer: mockSignerKeypair.publicKey,
-        programConfig: programConfigAddress,
-        vaultMint: mockMintKeypair.publicKey,
-        userVaultAccount: userVaultAddress,
-        userTokenAccount: userTokenAccount.address,
-      },
-      program,
-    });
-
-    const tx = new Transaction();
-    tx.add(instruction);
-
-    await expect(sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]))
-      .to.be.rejectedWith()
-      .then((e) => {
-        expect(
-          e.logs.some((log) =>
-            log.includes(
-              `AnchorError occurred. Error Code: PreSaleStillOn. Error Number: 6010. Error Message: Pre-sale campaign has not ended.`
-            )
-          )
-        ).to.be.true;
-      });
-  });
-
-  it("before successful [claimTokens] we set pre-sale to OFF", async () => {
+  it("setting PRE-SALE to OFF", async () => {
     const updateCollectedFundsInstruction =
       await updateProgramConfigInstruction({
         accounts: {
@@ -1528,6 +1627,7 @@ describe("pre-sale-program", () => {
           usdDecimals: null,
           collectedFundsAccount: null,
           chainlinkProgram: null,
+          availablePercentage: null,
         },
         program,
       });
@@ -1539,91 +1639,47 @@ describe("pre-sale-program", () => {
     );
   });
 
-  it("[claimTokens] should successfuly transfer all user tokens from the vault to user token account", async () => {
-    const programConfig = await program.account.programConfig.fetch(
-      programConfigAddress
-    );
-
+  it("[buyTokens] should fail if user tries to buy tokens after pre-sale ended", async () => {
     const [userVaultAddress] = PublicKey.findProgramAddressSync(
       [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
       program.programId
     );
 
-    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
-      mockSignerKeypair,
-      mockMintKeypair.publicKey,
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const wsolAtaForPayment = await getAssociatedTokenAddress(
+      getPriceFeeds("mainnet-beta").SOL.asset,
       mockSignerKeypair.publicKey
     );
 
-    const userVaultBalance = (await getAccount(connection, userVaultAddress))
-      .amount;
-
-    const userTokenBalance = (
-      await getAccount(connection, userTokenAccount.address)
-    ).amount;
-
-    expect(userTokenBalance).to.equal(0n);
-    expect(userVaultBalance).to.not.equal(0n);
-
-    const instruction = await claimTokensInstruction({
-      accounts: {
-        signer: mockSignerKeypair.publicKey,
-        programConfig: programConfigAddress,
-        vaultMint: mockMintKeypair.publicKey,
-        userVaultAccount: userVaultAddress,
-        userTokenAccount: userTokenAccount.address,
-      },
-      program,
-    });
-
-    const tx = new Transaction();
-    tx.add(instruction);
-
-    await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
-
-    const updatedUserVaultBalance = (
-      await getAccount(connection, userVaultAddress)
-    ).amount;
-
-    const updatedUserTokenBalance = (
-      await getAccount(connection, userTokenAccount.address)
-    ).amount;
-
-    expect(updatedUserVaultBalance).to.equal(0n);
-    expect(updatedUserTokenBalance).to.equal(userVaultBalance);
-  });
-
-  it("[claimTokens] should throw an error if the user has zero balance", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
     );
 
-    const [userVaultAddress] = PublicKey.findProgramAddressSync(
-      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
-      program.programId
+    const wsolAtaForCollecting = await getAssociatedTokenAddress(
+      getPriceFeeds("mainnet-beta").SOL.asset,
+      programConfig.collectedFundsAccount
     );
 
-    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
-      mockSignerKeypair,
-      mockMintKeypair.publicKey,
-      mockSignerKeypair.publicKey
-    );
-
-    const userVaultBalance = (await getAccount(connection, userVaultAddress))
-      .amount;
-
-    expect(userVaultBalance).to.equal(0n);
-
-    const instruction = await claimTokensInstruction({
+    const instruction = await buyTokensInstruction({
       accounts: {
         signer: mockSignerKeypair.publicKey,
         programConfig: programConfigAddress,
+        vaultAccount: tokenVaultAddress,
         vaultMint: mockMintKeypair.publicKey,
         userVaultAccount: userVaultAddress,
-        userTokenAccount: userTokenAccount.address,
+        userInfoAccount: userInfoAddress,
+        payerTokenAccount: wsolAtaForPayment,
+        collectedFundsTokenAccount: wsolAtaForCollecting,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: getPriceFeeds("mainnet-beta").SOL.asset,
+        chainlinkFeed: getPriceFeeds("mainnet-beta").SOL.dataFeed,
+        chainlinkProgram: CHAINLINK_PROGRAM,
       },
+      args: { amount: new BN(0) },
       program,
     });
 
@@ -1636,7 +1692,7 @@ describe("pre-sale-program", () => {
         expect(
           e.logs.some((log) =>
             log.includes(
-              `AnchorError occurred. Error Code: InsufficientVaultBalance. Error Number: 6008. Error Message: Amount of purchase is bigger than the amount in the treasury.`
+              `AnchorError occurred. Error Code: PreSaleEnded. Error Number: 6011. Error Message: Pre-sale campaign ended.`
             )
           )
         ).to.be.true;
@@ -1795,5 +1851,691 @@ describe("pre-sale-program", () => {
     expect(new BN(`${updatedTokenBalance}`).toString()).to.equal(
       amount.toString()
     );
+  });
+
+  it("before [claimTokens] we set pre-sale to ON", async () => {
+    const updateCollectedFundsInstruction =
+      await updateProgramConfigInstruction({
+        accounts: {
+          admin: mockRandomKeypair.publicKey,
+          programConfig: programConfigAddress,
+        },
+        args: {
+          hasPresaleEnded: false,
+          admin: null,
+          feeds: null,
+          usdPrice: null,
+          usdDecimals: null,
+          availablePercentage: null,
+          collectedFundsAccount: null,
+          chainlinkProgram: null,
+        },
+        program,
+      });
+
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(updateCollectedFundsInstruction),
+      [mockRandomKeypair]
+    );
+  });
+
+  it("[claimTokens] should throw an error if pre-sale has not ended", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    expect(programConfig.hasPresaleEnded).to.be.false;
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      mockSignerKeypair.publicKey
+    );
+
+    const instruction = await claimTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
+        userTokenAccount: userTokenAccount.address,
+      },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await expect(sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError occurred. Error Code: PreSaleStillOn. Error Number: 6010. Error Message: Pre-sale campaign has not ended.`
+            )
+          )
+        ).to.be.true;
+      });
+  });
+
+  it("before [claimTokens] we set PRE-SALE to OFF, 10% vesting", async () => {
+    const updateCollectedFundsInstruction =
+      await updateProgramConfigInstruction({
+        accounts: {
+          admin: mockRandomKeypair.publicKey,
+          programConfig: programConfigAddress,
+        },
+        args: {
+          hasPresaleEnded: true,
+          admin: null,
+          feeds: null,
+          usdPrice: null,
+          usdDecimals: null,
+          availablePercentage: new BN(10),
+          collectedFundsAccount: null,
+          chainlinkProgram: null,
+        },
+        program,
+      });
+
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(updateCollectedFundsInstruction),
+      [mockRandomKeypair]
+    );
+  });
+
+  it("[claimTokens] should successfuly get 10% of user token balance from the vault to user token account", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const userInfoAccount = await program.account.userInfo.fetch(
+      userInfoAddress
+    );
+
+    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      mockSignerKeypair.publicKey
+    );
+
+    const userVaultBalance = (await getAccount(connection, userVaultAddress))
+      .amount;
+
+    const userTokenBalance = (
+      await getAccount(connection, userTokenAccount.address)
+    ).amount;
+
+    expect(userTokenBalance).to.equal(0n);
+    expect(userVaultBalance).to.not.equal(0n);
+    expect(userInfoAccount.stake.toString()).to.equal(
+      new BN(`${userVaultBalance}`).toString()
+    );
+
+    const instruction = await claimTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
+        userTokenAccount: userTokenAccount.address,
+      },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
+
+    const updatedUserVaultBalance = (
+      await getAccount(connection, userVaultAddress)
+    ).amount;
+
+    const updatedUserTokenBalance = (
+      await getAccount(connection, userTokenAccount.address)
+    ).amount;
+
+    const expectedVaultUpdatedBalance =
+      Number(userVaultBalance) - Number(userVaultBalance) * 0.1;
+
+    const expectedUpdatedTokenBalance =
+      Number(userVaultBalance) - expectedVaultUpdatedBalance;
+
+    expect(Number(updatedUserVaultBalance)).to.equal(
+      expectedVaultUpdatedBalance
+    );
+    expect(Number(updatedUserTokenBalance)).to.equal(
+      expectedUpdatedTokenBalance
+    );
+  });
+
+  it("[claimTokens] should throw an error because user already claimed first portion of tokens", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      mockSignerKeypair.publicKey
+    );
+
+    const userVaultBalance = (await getAccount(connection, userVaultAddress))
+      .amount;
+
+    const instruction = await claimTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
+        userTokenAccount: userTokenAccount.address,
+      },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await expect(sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError occurred. Error Code: InsufficientVaultBalance. Error Number: 6008. Error Message: Amount of purchase is bigger than the amount in the treasury.`
+            )
+          )
+        ).to.be.true;
+      });
+  });
+
+  it("before [claimTokens] 20% vesting SET", async () => {
+    const updateCollectedFundsInstruction =
+      await updateProgramConfigInstruction({
+        accounts: {
+          admin: mockRandomKeypair.publicKey,
+          programConfig: programConfigAddress,
+        },
+        args: {
+          hasPresaleEnded: true,
+          admin: null,
+          feeds: null,
+          usdPrice: null,
+          usdDecimals: null,
+          availablePercentage: new BN(20),
+          collectedFundsAccount: null,
+          chainlinkProgram: null,
+        },
+        program,
+      });
+
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(updateCollectedFundsInstruction),
+      [mockRandomKeypair]
+    );
+  });
+
+  it("[claimTokens] should successfuly get 20% of user token balance from the vault to user token account", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const userInfoAccount = await program.account.userInfo.fetch(
+      userInfoAddress
+    );
+
+    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      mockSignerKeypair.publicKey
+    );
+
+    const userVaultBalance = (await getAccount(connection, userVaultAddress))
+      .amount;
+
+    const userTokenBalance = (
+      await getAccount(connection, userTokenAccount.address)
+    ).amount;
+
+    const instruction = await claimTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
+        userTokenAccount: userTokenAccount.address,
+      },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
+
+    const updatedUserVaultBalance = (
+      await getAccount(connection, userVaultAddress)
+    ).amount;
+
+    const updatedUserTokenBalance = (
+      await getAccount(connection, userTokenAccount.address)
+    ).amount;
+
+    const twentyPercentOfInitialStake = Number(userInfoAccount.stake) * 0.2;
+
+    const expectedVaultUpdatedBalance =
+      Number(userInfoAccount.stake) - twentyPercentOfInitialStake;
+
+    expect(expectedVaultUpdatedBalance).to.equal(9600_000000000);
+
+    expect(Number(updatedUserVaultBalance)).to.equal(
+      expectedVaultUpdatedBalance
+    );
+    expect(twentyPercentOfInitialStake).to.equal(
+      Number(updatedUserTokenBalance)
+    );
+  });
+
+  it("before [claimTokens] 50% vesting SET", async () => {
+    const updateCollectedFundsInstruction =
+      await updateProgramConfigInstruction({
+        accounts: {
+          admin: mockRandomKeypair.publicKey,
+          programConfig: programConfigAddress,
+        },
+        args: {
+          hasPresaleEnded: true,
+          admin: null,
+          feeds: null,
+          usdPrice: null,
+          usdDecimals: null,
+          availablePercentage: new BN(50),
+          collectedFundsAccount: null,
+          chainlinkProgram: null,
+        },
+        program,
+      });
+
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(updateCollectedFundsInstruction),
+      [mockRandomKeypair]
+    );
+  });
+
+  it("[claimTokens] should successfuly get 50% of user token balance from the vault to user token account", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const userInfoAccount = await program.account.userInfo.fetch(
+      userInfoAddress
+    );
+
+    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      mockSignerKeypair.publicKey
+    );
+
+    const userVaultBalance = (await getAccount(connection, userVaultAddress))
+      .amount;
+
+    const userTokenBalance = (
+      await getAccount(connection, userTokenAccount.address)
+    ).amount;
+
+    const instruction = await claimTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
+        userTokenAccount: userTokenAccount.address,
+      },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
+
+    const updatedUserVaultBalance = (
+      await getAccount(connection, userVaultAddress)
+    ).amount;
+
+    const updatedUserTokenBalance = (
+      await getAccount(connection, userTokenAccount.address)
+    ).amount;
+
+    const fiftyPercentOfInitialStake = Number(userInfoAccount.stake) * 0.5;
+
+    const expectedVaultUpdatedBalance =
+      Number(userInfoAccount.stake) - fiftyPercentOfInitialStake;
+
+    expect(expectedVaultUpdatedBalance).to.equal(6000_000000000);
+
+    expect(Number(updatedUserVaultBalance)).to.equal(
+      expectedVaultUpdatedBalance
+    );
+    expect(fiftyPercentOfInitialStake).to.equal(
+      Number(updatedUserTokenBalance)
+    );
+  });
+
+  it("before [claimTokens] 99% vesting SET", async () => {
+    const updateCollectedFundsInstruction =
+      await updateProgramConfigInstruction({
+        accounts: {
+          admin: mockRandomKeypair.publicKey,
+          programConfig: programConfigAddress,
+        },
+        args: {
+          hasPresaleEnded: true,
+          admin: null,
+          feeds: null,
+          usdPrice: null,
+          usdDecimals: null,
+          availablePercentage: new BN(99),
+          collectedFundsAccount: null,
+          chainlinkProgram: null,
+        },
+        program,
+      });
+
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(updateCollectedFundsInstruction),
+      [mockRandomKeypair]
+    );
+  });
+
+  it("[claimTokens] should successfuly get 99% of user token balance from the vault to user token account", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const userInfoAccount = await program.account.userInfo.fetch(
+      userInfoAddress
+    );
+
+    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      mockSignerKeypair.publicKey
+    );
+
+    const userVaultBalance = (await getAccount(connection, userVaultAddress))
+      .amount;
+
+    const userTokenBalance = (
+      await getAccount(connection, userTokenAccount.address)
+    ).amount;
+
+    const instruction = await claimTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
+        userTokenAccount: userTokenAccount.address,
+      },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
+
+    const updatedUserVaultBalance = (
+      await getAccount(connection, userVaultAddress)
+    ).amount;
+
+    const updatedUserTokenBalance = (
+      await getAccount(connection, userTokenAccount.address)
+    ).amount;
+
+    const nintyNinePercentOfInitialStake = Number(userInfoAccount.stake) * 0.99;
+
+    const expectedVaultUpdatedBalance =
+      Number(userInfoAccount.stake) - nintyNinePercentOfInitialStake;
+
+    expect(expectedVaultUpdatedBalance).to.equal(120_000000000);
+
+    expect(Number(updatedUserVaultBalance)).to.equal(
+      expectedVaultUpdatedBalance
+    );
+    expect(nintyNinePercentOfInitialStake).to.equal(
+      Number(updatedUserTokenBalance)
+    );
+  });
+
+  it("before [claimTokens] 100% vesting SET", async () => {
+    const updateCollectedFundsInstruction =
+      await updateProgramConfigInstruction({
+        accounts: {
+          admin: mockRandomKeypair.publicKey,
+          programConfig: programConfigAddress,
+        },
+        args: {
+          hasPresaleEnded: true,
+          admin: null,
+          feeds: null,
+          usdPrice: null,
+          usdDecimals: null,
+          availablePercentage: new BN(100),
+          collectedFundsAccount: null,
+          chainlinkProgram: null,
+        },
+        program,
+      });
+
+    await sendAndConfirmTransaction(
+      connection,
+      new Transaction().add(updateCollectedFundsInstruction),
+      [mockRandomKeypair]
+    );
+  });
+
+  it("[claimTokens] should successfuly get 100% of user token balance from the vault to user token account", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const userInfoAccount = await program.account.userInfo.fetch(
+      userInfoAddress
+    );
+
+    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      mockSignerKeypair.publicKey
+    );
+
+    const userVaultBalance = (await getAccount(connection, userVaultAddress))
+      .amount;
+
+    const userTokenBalance = (
+      await getAccount(connection, userTokenAccount.address)
+    ).amount;
+
+    const instruction = await claimTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
+        userTokenAccount: userTokenAccount.address,
+      },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]);
+
+    const updatedUserVaultBalance = (
+      await getAccount(connection, userVaultAddress)
+    ).amount;
+
+    const updatedUserTokenBalance = (
+      await getAccount(connection, userTokenAccount.address)
+    ).amount;
+
+    expect(updatedUserVaultBalance).to.equal(0n);
+
+    expect(Number(updatedUserTokenBalance)).to.equal(
+      Number(userInfoAccount.stake)
+    );
+
+    expect(Number(updatedUserTokenBalance)).to.equal(12000_000000000);
+  });
+
+  it("[claimTokens] should throw an error if the user has zero balance", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const [userVaultAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_vault"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockSignerKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      mockSignerKeypair,
+      mockMintKeypair.publicKey,
+      mockSignerKeypair.publicKey
+    );
+
+    const userVaultBalance = (await getAccount(connection, userVaultAddress))
+      .amount;
+
+    expect(userVaultBalance).to.equal(0n);
+
+    const instruction = await claimTokensInstruction({
+      accounts: {
+        signer: mockSignerKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultMint: mockMintKeypair.publicKey,
+        userVaultAccount: userVaultAddress,
+        userInfoAccount: userInfoAddress,
+        userTokenAccount: userTokenAccount.address,
+      },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await expect(sendAndConfirmTransaction(connection, tx, [mockSignerKeypair]))
+      .to.be.rejectedWith()
+      .then((e) => {
+        expect(
+          e.logs.some((log) =>
+            log.includes(
+              `AnchorError occurred. Error Code: InsufficientVaultBalance. Error Number: 6008. Error Message: Amount of purchase is bigger than the amount in the treasury.`
+            )
+          )
+        ).to.be.true;
+      });
   });
 });

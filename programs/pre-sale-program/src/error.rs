@@ -24,4 +24,6 @@ pub enum PreSaleProgramError {
     ConversionError,
     #[msg("Pre-sale campaign has not ended")]
     PreSaleStillOn,
+    #[msg("Pre-sale campaign ended")]
+    PreSaleEnded,
 }

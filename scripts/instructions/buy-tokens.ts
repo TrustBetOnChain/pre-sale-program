@@ -8,6 +8,7 @@ type BuyTokensArgs = {
     signer: PublicKey;
     vaultAccount: PublicKey;
     userVaultAccount: PublicKey;
+    userInfoAccount: PublicKey;
     payerTokenAccount: PublicKey;
     collectedFundsTokenAccount: PublicKey;
     collectedFundsAccount: PublicKey;

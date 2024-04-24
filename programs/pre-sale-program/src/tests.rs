@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use rust_decimal::prelude::ToPrimitive;
+    use rust_decimal::{ prelude::ToPrimitive, Decimal };
 
-    use crate::utils::convert_mint;
+    use crate::utils::*;
 
     #[test]
     fn test_convert_mint() {
@@ -172,6 +172,123 @@ mod tests {
             convert_mint(0, 6, 10, 2, sol_feed_price, feed_decimals, 9).to_u64().unwrap(),
             0,
             "Test case: Zero from_amount"
+        );
+    }
+
+    #[test]
+    fn test_calculate_claimable_amount() {
+        assert_eq!(
+            calculate_claimable_amount(1, 1, 23),
+            Decimal::new(23, 2),
+            "Test case: Stake 10100, Balance 1, Percentage 23"
+        );
+        assert_eq!(
+            calculate_claimable_amount(1, 1, 100),
+            Decimal::new(1, 0),
+            "Test case: Stake 1, Balance 1, Percentage 100"
+        );
+
+        assert_eq!(
+            calculate_claimable_amount(1, 1, 99),
+            Decimal::new(99, 2),
+            "Test case: Stake 1, Balance 1, Percentage 99"
+        );
+
+        assert_eq!(
+            calculate_claimable_amount(1, 1, 1),
+            Decimal::new(1, 2),
+            "Test case: Stake 1, Balance 1, Percentage 99"
+        );
+
+        assert_eq!(
+            calculate_claimable_amount(1, 0, 23),
+            Decimal::ZERO,
+            "Test case: Stake 1, Balance 0, Percentage 23"
+        );
+
+        assert_eq!(
+            calculate_claimable_amount(100, 100, 20),
+            Decimal::new(20, 0),
+            "Test case: Stake 100, Balance 100, Percentage 20"
+        );
+        assert_eq!(
+            calculate_claimable_amount(100, 80, 20),
+            Decimal::ZERO,
+            "Test case: Stake 100, Balance 80, Percentage 20"
+        );
+        assert_eq!(
+            calculate_claimable_amount(100, 70, 20),
+            Decimal::ZERO,
+            "Test case: Stake 100, Balance 70, Percentage 20"
+        );
+        assert_eq!(
+            calculate_claimable_amount(500, 500, 50),
+            Decimal::new(250, 0),
+            "Test case: Stake 500, Balance 500, Percentage 50"
+        );
+        assert_eq!(
+            calculate_claimable_amount(1000, 800, 30),
+            Decimal::new(100, 0),
+            "Test case: Stake 1000, Balance 800, Percentage 30"
+        );
+
+        assert_eq!(
+            calculate_claimable_amount(200, 180, 15),
+            Decimal::new(10, 0),
+            "Test case: Stake 200, Balance 180, Percentage 15"
+        );
+
+        assert_eq!(
+            calculate_claimable_amount(0, 1000, 50),
+            Decimal::new(1000, 0),
+            "Test case: Stake 0, Balance 1000, Percentage 50"
+        );
+
+        assert_eq!(
+            calculate_claimable_amount(1000, 0, 50),
+            Decimal::ZERO,
+            "Test case: Stake 1000, Balance 0, Percentage 50"
+        );
+        assert_eq!(
+            calculate_claimable_amount(1000, 1000, 0),
+            Decimal::ZERO,
+            "Test case: Stake 1000, Balance 1000, Percentage 0"
+        );
+        assert_eq!(
+            calculate_claimable_amount(100, 100, 100),
+            Decimal::new(100, 0),
+            "Test case: Stake 100, Balance 100, Percentage 100"
+        );
+        assert_eq!(
+            calculate_claimable_amount(100, 50, 100),
+            Decimal::new(50, 0),
+            "Test case: Stake 100, Balance 50, Percentage 100"
+        );
+        assert_eq!(
+            calculate_claimable_amount(100, 200, 100),
+            Decimal::new(200, 0),
+            "Test case: Stake 100, Balance 200, Percentage 100"
+        );
+
+        assert_eq!(
+            calculate_claimable_amount(5000, 4000, 10),
+            Decimal::ZERO,
+            "Test case: Stake 5000, Balance 4000, Percentage 10"
+        );
+        assert_eq!(
+            calculate_claimable_amount(10000_0000000000, 8000_0000000000, 5),
+            Decimal::new(0, 0),
+            "Test case: Stake 10000_0000000000, Balance 8000_0000000000, Percentage 5"
+        );
+        assert_eq!(
+            calculate_claimable_amount(500, 600, 80),
+            Decimal::new(500, 0),
+            "Test case: Stake 500, Balance 600, Percentage 80"
+        );
+        assert_eq!(
+            calculate_claimable_amount(1000, 500, 75),
+            Decimal::new(250, 0),
+            "Test case: Stake 1000, Balance 500, Percentage 75"
         );
     }
 }

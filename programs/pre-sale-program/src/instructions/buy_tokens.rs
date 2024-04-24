@@ -23,6 +23,15 @@ pub struct BuyTokens<'info> {
 
     #[account(
         init_if_needed,
+        seeds = [constants::USER_INFO_SEED, signer.key.as_ref()],
+        bump,
+        payer = signer,
+        space = 8 + std::mem::size_of::<UserInfo>()
+    )]
+    pub user_info_account: Box<Account<'info, UserInfo>>,
+
+    #[account(
+        init_if_needed,
         seeds = [constants::USER_VAULT_SEED, signer.key().as_ref()],
         bump,
         payer = signer,
@@ -48,10 +57,10 @@ pub struct BuyTokens<'info> {
     #[account(
         constraint = vault_mint.key() == vault_account.mint @ PreSaleProgramError::InvalidVaultMint,
     )]
-    pub vault_mint: Account<'info, Mint>,
+    pub vault_mint: Box<Account<'info, Mint>>,
 
     #[account()]
-    pub payer_mint: Account<'info, Mint>,
+    pub payer_mint: Box<Account<'info, Mint>>,
 
     /// CHECK: We're reading data from this specified chainlink feed
     #[account(
@@ -86,6 +95,10 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
         return Err(PreSaleProgramError::InsufficientVaultBalance.into());
     }
 
+    if ctx.accounts.program_config.has_presale_ended {
+        return Err(PreSaleProgramError::PreSaleEnded.into());
+    }
+
     let payer_mint_amount = calculate_payer_mint_amount(&ctx, amount)?;
 
     if payer_mint_amount <= 0 {
@@ -94,6 +107,7 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
 
     transfer_funds_to_collector(&ctx, payer_mint_amount)?;
     transfer_tokens_to_user(&ctx, amount)?;
+    update_user_stake(&mut ctx.accounts.user_info_account, amount)?;
 
     Ok(())
 }
@@ -186,5 +200,10 @@ fn transfer_tokens_to_user<'info>(ctx: &Context<BuyTokens>, amount: u64) -> Resu
 
     token::transfer(CpiContext::new_with_signer(cpi_program, cpi_accounts, signer), amount)?;
 
+    Ok(())
+}
+
+fn update_user_stake(user_info: &mut Account<UserInfo>, amount: u64) -> Result<()> {
+    user_info.stake = user_info.stake.checked_add(amount).ok_or(PreSaleProgramError::MathOverflow)?;
     Ok(())
 }

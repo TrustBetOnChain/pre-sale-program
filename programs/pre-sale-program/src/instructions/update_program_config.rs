@@ -11,6 +11,7 @@ pub struct UpdateProgramConfigArgs {
     pub usd_decimals: Option<u8>,
     pub collected_funds_account: Option<Pubkey>,
     pub chainlink_program: Option<Pubkey>,
+    pub available_percentage: Option<u64>,
 }
 
 #[derive(Accounts)]
@@ -71,6 +72,10 @@ pub fn update_program_config(
 
     if let Some(has_presale_ended) = args.has_presale_ended {
         program_config.has_presale_ended = has_presale_ended;
+    }
+
+    if let Some(available_percentage) = args.available_percentage {
+        program_config.available_percentage = available_percentage;
     }
 
     Ok(())

@@ -17,6 +17,7 @@ pub mod constants {
     pub const CONFIG_SEED: &[u8] = b"config";
     pub const VAULT_SEED: &[u8] = b"vault";
     pub const USER_VAULT_SEED: &[u8] = b"user_vault";
+    pub const USER_INFO_SEED: &[u8] = b"user_info";
 }
 
 #[program]

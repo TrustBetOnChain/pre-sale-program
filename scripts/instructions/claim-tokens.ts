@@ -6,6 +6,7 @@ type ClaimTokensArgs = {
   accounts: {
     signer: PublicKey;
     userVaultAccount: PublicKey;
+    userInfoAccount: PublicKey;
     userTokenAccount: PublicKey;
     programConfig: PublicKey;
     vaultMint: PublicKey;
