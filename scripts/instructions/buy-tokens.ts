@@ -7,13 +7,11 @@ type BuyTokensArgs = {
   accounts: {
     signer: PublicKey;
     vaultAccount: PublicKey;
-    userVaultAccount: PublicKey;
+    programConfig: PublicKey;
     userInfoAccount: PublicKey;
     payerTokenAccount: PublicKey;
     collectedFundsTokenAccount: PublicKey;
     collectedFundsAccount: PublicKey;
-    programConfig: PublicKey;
-    vaultMint: PublicKey;
     chainlinkProgram: PublicKey;
     payerMint: PublicKey;
     chainlinkFeed: PublicKey;

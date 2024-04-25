@@ -13,9 +13,9 @@ type UpdateProgramConfigAgrs = {
     admin: PublicKey | null;
     chainlinkProgram: PublicKey | null;
     collectedFundsAccount: PublicKey | null;
-    usdPrice: BN | null;
+    usdPrice: number | null;
     usdDecimals: number | null;
-    availablePercentage: BN | null;
+    availablePercentage: number | null;
     feeds: PriceFeedInfo[] | null;
   };
   accounts: {

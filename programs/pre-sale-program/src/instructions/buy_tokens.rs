@@ -18,8 +18,8 @@ pub struct BuyTokens<'info> {
     #[account(seeds = [constants::CONFIG_SEED], bump)]
     pub program_config: Box<Account<'info, ProgramConfig>>,
 
-    #[account(mut, seeds = [constants::VAULT_SEED], bump)]
-    pub vault_account: Box<Account<'info, TokenAccount>>,
+    #[account(mut, seeds = [constants::VAULT_INFO_SEED], bump)]
+    pub vault_account: Box<Account<'info, VaultInfo>>,
 
     #[account(
         init_if_needed,
@@ -29,16 +29,6 @@ pub struct BuyTokens<'info> {
         space = 8 + std::mem::size_of::<UserInfo>()
     )]
     pub user_info_account: Box<Account<'info, UserInfo>>,
-
-    #[account(
-        init_if_needed,
-        seeds = [constants::USER_VAULT_SEED, signer.key().as_ref()],
-        bump,
-        payer = signer,
-        token::mint = vault_mint,
-        token::authority = user_vault_account
-    )]
-    pub user_vault_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         mut,
@@ -53,11 +43,6 @@ pub struct BuyTokens<'info> {
         associated_token::authority = program_config.collected_funds_account
     )]
     pub collected_funds_token_account: Box<Account<'info, TokenAccount>>,
-
-    #[account(
-        constraint = vault_mint.key() == vault_account.mint @ PreSaleProgramError::InvalidVaultMint,
-    )]
-    pub vault_mint: Box<Account<'info, Mint>>,
 
     #[account()]
     pub payer_mint: Box<Account<'info, Mint>>,
@@ -91,7 +76,7 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
     let amount = args.amount;
 
     // Check if the requested amount is greater than the vault account balance
-    if amount > ctx.accounts.vault_account.amount {
+    if amount > ctx.accounts.vault_account.stake {
         return Err(PreSaleProgramError::InsufficientVaultBalance.into());
     }
 
@@ -106,7 +91,7 @@ pub fn buy_tokens(ctx: Context<BuyTokens>, args: BuyTokensArgs) -> Result<()> {
     }
 
     transfer_funds_to_collector(&ctx, payer_mint_amount)?;
-    transfer_tokens_to_user(&ctx, amount)?;
+    update_vault_stake(&mut ctx.accounts.vault_account, amount)?;
     update_user_stake(&mut ctx.accounts.user_info_account, amount)?;
 
     Ok(())
@@ -124,7 +109,7 @@ fn calculate_payer_mint_amount(ctx: &Context<BuyTokens>, amount: u64) -> Result<
 
     let d_payer_mint_amount = utils::convert_mint(
         amount,
-        ctx.accounts.vault_mint.decimals,
+        ctx.accounts.vault_account.decimals,
         ctx.accounts.program_config.usd_price,
         ctx.accounts.program_config.usd_decimals,
         round.answer as u64,
@@ -187,19 +172,10 @@ fn transfer_spl_to_collector<'info>(
     Ok(())
 }
 
-fn transfer_tokens_to_user<'info>(ctx: &Context<BuyTokens>, amount: u64) -> Result<()> {
-    let bump = ctx.bumps.vault_account;
-    let signer: &[&[&[u8]]] = &[&[constants::VAULT_SEED, &[bump]]];
-
-    let cpi_accounts = Transfer {
-        from: ctx.accounts.vault_account.to_account_info().clone(),
-        to: ctx.accounts.user_vault_account.to_account_info().clone(),
-        authority: ctx.accounts.vault_account.to_account_info().clone(),
-    };
-    let cpi_program = ctx.accounts.token_program.to_account_info();
-
-    token::transfer(CpiContext::new_with_signer(cpi_program, cpi_accounts, signer), amount)?;
-
+fn update_vault_stake(vault_info: &mut Account<VaultInfo>, amount: u64) -> Result<()> {
+    vault_info.stake = vault_info.stake
+        .checked_sub(amount)
+        .ok_or(PreSaleProgramError::MathOverflow)?;
     Ok(())
 }
 

@@ -7,14 +7,5 @@ pub use update_program_config::*;
 mod buy_tokens;
 pub use buy_tokens::*;
 
-mod claim_tokens;
-pub use claim_tokens::*;
-
-mod withdraw_tokens;
-pub use withdraw_tokens::*;
-
-mod get_payer_token_amount;
-pub use get_payer_token_amount::*;
-
-mod get_data_feed;
-pub use get_data_feed::*;
+mod update_vault;
+pub use update_vault::*;

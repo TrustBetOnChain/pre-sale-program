@@ -7,11 +7,11 @@ pub struct UpdateProgramConfigArgs {
     pub admin: Option<Pubkey>,
     pub feeds: Option<Vec<PriceFeedInfo>>,
     pub has_presale_ended: Option<bool>,
-    pub usd_price: Option<u64>,
+    pub usd_price: Option<u8>,
     pub usd_decimals: Option<u8>,
     pub collected_funds_account: Option<Pubkey>,
     pub chainlink_program: Option<Pubkey>,
-    pub available_percentage: Option<u64>,
+    pub available_percentage: Option<u8>,
 }
 
 #[derive(Accounts)]

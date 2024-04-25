@@ -6,14 +6,14 @@ pub struct ProgramConfig {
     pub collected_funds_account: Pubkey,
     pub chainlink_program: Pubkey,
     pub has_presale_ended: bool,
-    pub usd_price: u64,
+    pub usd_price: u8,
     pub usd_decimals: u8,
-    pub available_percentage: u64,
+    pub available_percentage: u8,
     pub feeds: Vec<PriceFeedInfo>,
 }
 
 impl ProgramConfig {
-    pub const BASE_LEN: usize = 8 + 32 + 32 + 32 + 1 + 8 + 1 + 8;
+    pub const BASE_LEN: usize = 8 + 32 + 32 + 32 + 1 + 1 + 1 + 1;
 
     pub fn get_len(mints_len: usize) -> usize {
         let mints_size = mints_len * PriceFeedInfo::get_len();
@@ -39,9 +39,8 @@ pub struct UserInfo {
     pub stake: u64,
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct DataFeed {
-    pub value: i128,
-    pub description: String,
+#[account]
+pub struct VaultInfo {
+    pub stake: u64,
     pub decimals: u8,
 }

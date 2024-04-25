@@ -1,6 +1,6 @@
-use anchor_spl::token::{ Mint, Token, TokenAccount };
+use anchor_spl::token::{ Mint, Token };
 use anchor_lang::prelude::*;
-use crate::state::ProgramConfig;
+use crate::state::{ ProgramConfig, VaultInfo };
 use crate::constants::*;
 
 #[derive(Accounts)]
@@ -10,13 +10,12 @@ pub struct InitializeProgramConfig<'info> {
 
     #[account(
         init,
-        seeds = [VAULT_SEED],
+        seeds = [VAULT_INFO_SEED],
         bump,
         payer = signer,
-        token::mint = mint,
-        token::authority = vault_account
+        space = 8 + std::mem::size_of::<VaultInfo>()
     )]
-    pub vault_account: Account<'info, TokenAccount>,
+    pub vault_account: Account<'info, VaultInfo>,
 
     /// CHECK: This is an external account used for collecting funds
     pub collected_funds_account: AccountInfo<'info>,
@@ -28,7 +27,6 @@ pub struct InitializeProgramConfig<'info> {
     pub mint: Account<'info, Mint>,
     /// CHECK: This is the Chainlink program library
     pub chainlink_program: AccountInfo<'info>,
-    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 
