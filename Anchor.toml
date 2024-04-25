@@ -15,7 +15,7 @@ pre_sale_program = "766iB3MufKxoStQRGHRs4CHToTMEkBTRYNeRoRcSR3LH"
 url = "https://anchor.projectserum.com"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "/Users/yanmarinich/.config/solana/id.json"
 
 [scripts]

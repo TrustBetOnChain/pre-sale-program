@@ -104,37 +104,37 @@ describe("pre-sale-program", () => {
     );
   });
 
-  it("[getDataFeed] should return price feed!", async () => {
-    interface Feed {
-      decimals: number;
-      description: string;
-      value: bigint;
-    }
+  // it("[getDataFeed] should return price feed!", async () => {
+  //   interface Feed {
+  //     decimals: number;
+  //     description: string;
+  //     value: bigint;
+  //   }
 
-    const sol_feed: Feed = await program.methods
-      .getDataFeed()
-      .accounts({
-        chainlinkProgram: CHAINLINK_PROGRAM,
-        chainlinkFeed: chainlink_price_feed["mainnet-beta"].USDT_USD,
-      })
-      .view();
+  //   const sol_feed: Feed = await program.methods
+  //     .getDataFeed()
+  //     .accounts({
+  //       chainlinkProgram: CHAINLINK_PROGRAM,
+  //       chainlinkFeed: chainlink_price_feed["mainnet-beta"].USDT_USD,
+  //     })
+  //     .view();
 
-    const usdtUsdPrice = convertLamports(sol_feed.value, sol_feed.decimals);
-    // TODO: figure out how to round stable coins
-    // expect(usdtUsdPrice.eqn(1)).to.be.true;
+  //   const usdtUsdPrice = convertLamports(sol_feed.value, sol_feed.decimals);
+  //   // TODO: figure out how to round stable coins
+  //   // expect(usdtUsdPrice.eqn(1)).to.be.true;
 
-    const usdc_feed: Feed = await program.methods
-      .getDataFeed()
-      .accounts({
-        chainlinkProgram: CHAINLINK_PROGRAM,
-        chainlinkFeed: chainlink_price_feed["mainnet-beta"].USDC_USD,
-      })
-      .view();
+  //   const usdc_feed: Feed = await program.methods
+  //     .getDataFeed()
+  //     .accounts({
+  //       chainlinkProgram: CHAINLINK_PROGRAM,
+  //       chainlinkFeed: chainlink_price_feed["mainnet-beta"].USDC_USD,
+  //     })
+  //     .view();
 
-    const usdcUsdPrice = convertLamports(usdc_feed.value, usdc_feed.decimals);
-    // TODO: figure out how to round stable coins
-    // expect(usdcUsdPrice.eqn(1)).to.be.true;
-  });
+  //   const usdcUsdPrice = convertLamports(usdc_feed.value, usdc_feed.decimals);
+  //   // TODO: figure out how to round stable coins
+  //   // expect(usdcUsdPrice.eqn(1)).to.be.true;
+  // });
 
   it("[initializeProgramConfig] should be initialized!", async () => {
     const initializeProgramConfigInstruction =
