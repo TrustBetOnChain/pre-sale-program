@@ -31,14 +31,15 @@ async function updateProgramConfig() {
         hasPresaleEnded: null,
         admin: null,
         chainlinkProgram: null,
-        collectedFundsAccount: null,
-        // collectedFundsAccount: new PublicKey(
-        //   "9StLPqawgBnTXVUkJ5eDCVj2Nnsdjuz2is9cAkKGQJqM"
-        // ),
+        // collectedFundsAccount: null,
+        collectedFundsAccount: new PublicKey(
+          "9StLPqawgBnTXVUkJ5eDCVj2Nnsdjuz2is9cAkKGQJqM"
+        ),
         usdPrice: new BN(20),
         usdDecimals: 2,
-        feeds: null,
-        // feeds: Object.values(getPriceFeeds("devnet")),
+        availablePercentage: new BN(0),
+        // feeds: null,
+        feeds: Object.values(getPriceFeeds("devnet")),
       },
       program,
     });

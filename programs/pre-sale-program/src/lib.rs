@@ -11,7 +11,7 @@ mod utils;
 #[cfg(test)]
 mod tests;
 
-declare_id!("AUAfQQmCDmzKn3hLBPPPUq5E2Z1FwY6eETkAg1qmQfEm");
+declare_id!("766iB3MufKxoStQRGHRs4CHToTMEkBTRYNeRoRcSR3LH");
 
 pub mod constants {
     pub const CONFIG_SEED: &[u8] = b"config";
