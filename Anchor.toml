@@ -5,17 +5,17 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-pre_sale_program = "CaUQ8EQBqzLDVFGNrHbci7ZQQVtQcJQ2u4Dg1zSsxWKR"
+pre_sale_program = "CksdmMwTMoiotvYaNhXt8yUTYWHG4z8bBDvnq3cGY1EC"
 [programs.devnet]
-pre_sale_program = "CaUQ8EQBqzLDVFGNrHbci7ZQQVtQcJQ2u4Dg1zSsxWKR"
+pre_sale_program = "CksdmMwTMoiotvYaNhXt8yUTYWHG4z8bBDvnq3cGY1EC"
 [programs.mainnet]
-pre_sale_program = "CaUQ8EQBqzLDVFGNrHbci7ZQQVtQcJQ2u4Dg1zSsxWKR"
+pre_sale_program = "CksdmMwTMoiotvYaNhXt8yUTYWHG4z8bBDvnq3cGY1EC"
 
 [registry]
 url = "https://anchor.projectserum.com"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "/Users/yanmarinich/.config/solana/id.json"
 
 [scripts]
