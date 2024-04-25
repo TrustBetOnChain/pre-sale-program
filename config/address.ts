@@ -31,7 +31,7 @@ export const chainlink_price_feed: Record<SupportedNetwork, ChainlinkFeed> = {
 };
 
 export const PRE_SALE_PROGRAM = new PublicKey(
-  "766iB3MufKxoStQRGHRs4CHToTMEkBTRYNeRoRcSR3LH"
+  "CaUQ8EQBqzLDVFGNrHbci7ZQQVtQcJQ2u4Dg1zSsxWKR"
 );
 
 export const CHAINLINK_PROGRAM = new PublicKey(

@@ -45,10 +45,7 @@ import {
   getAssociatedTokenAddress,
   getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
-import { viewTokenAmount } from "../scripts/views";
 import { buyTokensInstruction } from "../scripts/instructions/buy-tokens";
-import { withdrawTokensInstruction } from "../scripts/instructions/withdraw-tokens";
-import { resolve } from "path";
 import { updateVaultInstruction } from "../scripts/instructions/update-vault";
 
 chai.use(chaiAsPromised);
@@ -60,6 +57,11 @@ describe("pre-sale-program", () => {
   const mintDecimals = 9;
 
   let program = workspace.PreSaleProgram as Program<PreSaleProgram>;
+
+  async function fetchConfigSize(account: any) {
+    return (await program.coder.accounts.encode("ProgramConfig", account))
+      .length;
+  }
 
   let [programConfigAddress] = PublicKey.findProgramAddressSync(
     [Buffer.from("config")],
@@ -111,7 +113,6 @@ describe("pre-sale-program", () => {
           signer: mockSignerKeypair.publicKey,
           programConfig: programConfigAddress,
           vaultAccount: vaultAddress,
-          mint: mockMintKeypair.publicKey,
           collectedFundsAccount: mockCollectedFundsKeypair.publicKey,
           chainlinkProgram: CHAINLINK_OFFCHAIN_PROGRAM,
         },
@@ -147,7 +148,6 @@ describe("pre-sale-program", () => {
           signer: mockSignerKeypair.publicKey,
           programConfig: programConfigAddress,
           vaultAccount: vaultAddress,
-          mint: mockMintKeypair.publicKey,
           collectedFundsAccount: mockCollectedFundsKeypair.publicKey,
           chainlinkProgram: CHAINLINK_PROGRAM,
         },
@@ -181,7 +181,6 @@ describe("pre-sale-program", () => {
         admin: mockRandomKeypair.publicKey,
         feeds: [],
         usdPrice: 50,
-        availablePercentage: null,
         usdDecimals: 2,
         collectedFundsAccount: mockRandomKeypair.publicKey,
         chainlinkProgram: CHAINLINK_PROGRAM,
@@ -222,7 +221,6 @@ describe("pre-sale-program", () => {
         admin: null,
         feeds: null,
         usdPrice: null,
-        availablePercentage: null,
         usdDecimals: null,
         collectedFundsAccount: null,
         chainlinkProgram: null,
@@ -264,7 +262,6 @@ describe("pre-sale-program", () => {
         hasPresaleEnded: null,
         admin: mockRandomKeypair.publicKey,
         feeds: null,
-        availablePercentage: null,
         usdPrice: null,
         usdDecimals: null,
         collectedFundsAccount: null,
@@ -310,7 +307,6 @@ describe("pre-sale-program", () => {
         admin: null,
         feeds,
         usdPrice: null,
-        availablePercentage: null,
         usdDecimals: null,
         collectedFundsAccount: null,
         chainlinkProgram: null,
@@ -341,57 +337,6 @@ describe("pre-sale-program", () => {
     );
   });
 
-  it("[updateProgramConfig] should update available percentage value", async () => {
-    const value = 20;
-    const programConfig = await program.account.programConfig.fetch(
-      programConfigAddress
-    );
-
-    expect(programConfig.availablePercentage).to.equal(0);
-
-    const instruction = await updateProgramConfigInstruction({
-      accounts: {
-        programConfig: programConfigAddress,
-        admin: mockRandomKeypair.publicKey,
-      },
-      args: {
-        hasPresaleEnded: null,
-        admin: null,
-        feeds: null,
-        usdPrice: null,
-        usdDecimals: null,
-        collectedFundsAccount: null,
-        chainlinkProgram: null,
-        availablePercentage: value,
-      },
-      program,
-    });
-
-    const tx = new Transaction();
-    tx.add(instruction);
-
-    await sendAndConfirmTransaction(connection, tx, [mockRandomKeypair]);
-
-    const updatedProgramConfig = await program.account.programConfig.fetch(
-      programConfigAddress
-    );
-
-    expect(programConfig.admin.toString()).to.equal(
-      updatedProgramConfig.admin.toString()
-    );
-    expect(programConfig.hasPresaleEnded).to.equal(
-      updatedProgramConfig.hasPresaleEnded
-    );
-
-    expect(updatedProgramConfig.availablePercentage.toString()).to.equal(
-      value.toString()
-    );
-
-    expect(programConfig.availablePercentage.toString()).to.not.equal(
-      updatedProgramConfig.availablePercentage.toString()
-    );
-  });
-
   it("[updateProgramConfig] should only update collectedFundsAccount value", async () => {
     const programConfig = await program.account.programConfig.fetch(
       programConfigAddress
@@ -412,7 +357,6 @@ describe("pre-sale-program", () => {
         feeds: null,
         usdPrice: null,
         usdDecimals: null,
-        availablePercentage: null,
         collectedFundsAccount: mockRandomKeypair.publicKey,
         chainlinkProgram: null,
       },
@@ -461,7 +405,6 @@ describe("pre-sale-program", () => {
         usdDecimals: null,
         collectedFundsAccount: null,
         chainlinkProgram: CHAINLINK_PROGRAM,
-        availablePercentage: null,
       },
       program,
     });
@@ -519,7 +462,6 @@ describe("pre-sale-program", () => {
       args: {
         hasPresaleEnded: null,
         admin: null,
-        availablePercentage: null,
         feeds: null,
         usdPrice: usdPrice * 10 ** usdDecimals,
         usdDecimals,
@@ -571,11 +513,6 @@ describe("pre-sale-program", () => {
       programConfigAddress
     );
 
-    async function fetchConfigSize(account: any) {
-      return (await program.coder.accounts.encode("ProgramConfig", account))
-        .length;
-    }
-
     expect(await fetchConfigSize(programConfig)).to.equal(
       calculateConfigSize(programConfig.feeds.length)
     );
@@ -601,7 +538,6 @@ describe("pre-sale-program", () => {
         feeds,
         usdPrice: null,
         usdDecimals: null,
-        availablePercentage: null,
         collectedFundsAccount: null,
         chainlinkProgram: null,
       },
@@ -631,7 +567,6 @@ describe("pre-sale-program", () => {
         hasPresaleEnded: null,
         admin: null,
         feeds: null,
-        availablePercentage: null,
         usdPrice: null,
         usdDecimals: null,
         collectedFundsAccount: null,
@@ -669,7 +604,6 @@ describe("pre-sale-program", () => {
           admin: null,
           feeds: null,
           usdPrice: null,
-          availablePercentage: null,
           usdDecimals: null,
           collectedFundsAccount: null,
           chainlinkProgram: null,
@@ -1071,7 +1005,6 @@ describe("pre-sale-program", () => {
           feeds: null,
           usdPrice: null,
           usdDecimals: null,
-          availablePercentage: null,
           collectedFundsAccount: mockCollectedFundsKeypair.publicKey,
           chainlinkProgram: null,
         },
@@ -1267,7 +1200,6 @@ describe("pre-sale-program", () => {
           usdDecimals: null,
           collectedFundsAccount: null,
           chainlinkProgram: null,
-          availablePercentage: null,
         },
         program,
       });
@@ -1319,7 +1251,7 @@ describe("pre-sale-program", () => {
 
     expect(userInfo.stake.toString()).to.equal(previousAmount.toString());
 
-    const amount = maxAvailableInVault;
+    const amount = new BN(1_000 * 10 ** mintDecimals);
 
     const instruction = await buyTokensInstruction({
       accounts: {
@@ -1356,9 +1288,66 @@ describe("pre-sale-program", () => {
     const updUserInfo = await program.account.userInfo.fetch(userInfoAddress);
     const updVaultInfo = await program.account.vaultInfo.fetch(vaultAddress);
 
-    expect(Number(updVaultInfo.stake)).to.equal(0);
+    expect(Number(updVaultInfo.stake)).to.equal(1000 * 10 ** mintDecimals);
 
-    expect(Number(updUserInfo.stake)).to.equal(Number(initialVaultAmount));
+    expect(Number(updUserInfo.stake)).to.equal(
+      Number(previousAmount.add(amount))
+    );
+  });
+
+  it("[buyTokens] should buy tokens with SOL", async () => {
+    const programConfig = await program.account.programConfig.fetch(
+      programConfigAddress
+    );
+
+    const [userInfoAddress] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_info"), mockRandomKeypair.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const wsolAtaForPayment = await getOrCreateAssociatedTokenAccount(
+      connection,
+      mockRandomKeypair,
+      getPriceFeeds("mainnet-beta").SOL.asset,
+      mockRandomKeypair.publicKey
+    );
+
+    const wsolAtaForCollecting = await getOrCreateAssociatedTokenAccount(
+      connection,
+      mockRandomKeypair,
+      getPriceFeeds("mainnet-beta").SOL.asset,
+      programConfig.collectedFundsAccount
+    );
+
+    const amount = new BN(1_000 * 10 ** mintDecimals);
+
+    const instruction = await buyTokensInstruction({
+      accounts: {
+        signer: mockRandomKeypair.publicKey,
+        programConfig: programConfigAddress,
+        vaultAccount: vaultAddress,
+        userInfoAccount: userInfoAddress,
+        payerTokenAccount: wsolAtaForPayment.address,
+        collectedFundsTokenAccount: wsolAtaForCollecting.address,
+        collectedFundsAccount: programConfig.collectedFundsAccount,
+        payerMint: getPriceFeeds("mainnet-beta").SOL.asset,
+        chainlinkFeed: getPriceFeeds("mainnet-beta").SOL.dataFeed,
+        chainlinkProgram: CHAINLINK_PROGRAM,
+      },
+      args: { amount },
+      program,
+    });
+
+    const tx = new Transaction();
+    tx.add(instruction);
+
+    await sendAndConfirmTransaction(connection, tx, [mockRandomKeypair]);
+
+    const userInfo = await program.account.userInfo.fetch(userInfoAddress);
+    const vaultInfo = await program.account.vaultInfo.fetch(vaultAddress);
+
+    expect(userInfo.stake.toNumber()).to.equal(amount.toNumber());
+    expect(vaultInfo.stake.toNumber()).to.equal(0);
   });
 
   it("setting PRE-SALE to OFF", async () => {
@@ -1376,7 +1365,6 @@ describe("pre-sale-program", () => {
           usdDecimals: null,
           collectedFundsAccount: null,
           chainlinkProgram: null,
-          availablePercentage: null,
         },
         program,
       });
@@ -1439,5 +1427,14 @@ describe("pre-sale-program", () => {
           )
         ).to.be.true;
       });
+  });
+
+  it("it should get all user PDAs ", async () => {
+    // Get all accounts owned by the program
+    const accounts = await connection.getProgramAccounts(program.programId);
+
+    const userInfos = accounts.filter(
+      (account: any) => account.account.space === 8 + 8
+    );
   });
 });

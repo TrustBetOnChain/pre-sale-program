@@ -25,17 +25,3 @@ pub fn convert_mint(
 
     d_to_amount
 }
-
-pub fn calculate_claimable_amount(stake: u64, balance: u64, available_percentage: u64) -> Decimal {
-    let d_stake = to_decimal(stake, 0).unwrap();
-    let d_portion = to_decimal(available_percentage, 2).unwrap();
-    let d_balance = to_decimal(balance, 0).unwrap();
-
-    let d_locked_amount = d_stake
-        .checked_mul(Decimal::ONE.checked_sub(d_portion).unwrap())
-        .unwrap();
-
-    let d_claimable_amount = d_balance.checked_sub(d_locked_amount).unwrap();
-
-    d_claimable_amount.max(Decimal::ZERO)
-}

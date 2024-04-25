@@ -9,7 +9,6 @@ type InitializeProgramConfigAgrs = {
     chainlinkProgram: PublicKey;
     collectedFundsAccount: PublicKey;
     vaultAccount: PublicKey;
-    mint: PublicKey;
   };
   program: Program<PreSaleProgram>;
 };

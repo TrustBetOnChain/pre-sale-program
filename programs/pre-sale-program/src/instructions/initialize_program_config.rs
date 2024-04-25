@@ -1,4 +1,3 @@
-use anchor_spl::token::{ Mint, Token };
 use anchor_lang::prelude::*;
 use crate::state::{ ProgramConfig, VaultInfo };
 use crate::constants::*;
@@ -24,7 +23,6 @@ pub struct InitializeProgramConfig<'info> {
         mut,
     )]
     pub signer: Signer<'info>,
-    pub mint: Account<'info, Mint>,
     /// CHECK: This is the Chainlink program library
     pub chainlink_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,

@@ -22,7 +22,6 @@ export function calculateConfigSize(mintsLength: number) {
   const DISCRIMINATOR_SIZE = 8;
   const VECTOR_SIZE = 4;
   const USD_PRICE_SIZE = 1;
-  const AVAILABLE_PERCENTAGE_SIZE = 1;
   const PRICE_DECIMALS_SIZE = 1;
 
   const MINT_SIZE = PUB_KEY_SIZE * 2;
@@ -33,8 +32,7 @@ export function calculateConfigSize(mintsLength: number) {
     PUB_KEY_SIZE +
     BOOL_SIZE +
     USD_PRICE_SIZE +
-    PRICE_DECIMALS_SIZE +
-    AVAILABLE_PERCENTAGE_SIZE;
+    PRICE_DECIMALS_SIZE;
 
   return BASE_CONFIG_SIZE + VECTOR_SIZE + MINT_SIZE * mintsLength;
 }

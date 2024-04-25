@@ -35,9 +35,8 @@ async function updateProgramConfig() {
         collectedFundsAccount: new PublicKey(
           "9StLPqawgBnTXVUkJ5eDCVj2Nnsdjuz2is9cAkKGQJqM"
         ),
-        usdPrice: new BN(20),
+        usdPrice: 10,
         usdDecimals: 2,
-        availablePercentage: new BN(0),
         // feeds: null,
         feeds: Object.values(getPriceFeeds("devnet")),
       },

@@ -24,8 +24,8 @@ async function init() {
     program.programId
   );
 
-  const [tokenVaultAddress] = PublicKey.findProgramAddressSync(
-    [Buffer.from("vault")],
+  const [vaultAddress] = PublicKey.findProgramAddressSync(
+    [Buffer.from("vault_info")],
     program.programId
   );
 
@@ -34,8 +34,7 @@ async function init() {
       accounts: {
         signer: singer.publicKey,
         programConfig: programConfigAddress,
-        vaultAccount: tokenVaultAddress,
-        mint: mint.publicKey,
+        vaultAccount: vaultAddress,
         collectedFundsAccount: collector.publicKey,
         chainlinkProgram: CHAINLINK_PROGRAM,
       },
