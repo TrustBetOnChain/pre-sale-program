@@ -6,6 +6,7 @@
     "mintspl": "tsx scripts/spl/mint-spl.ts",
     "createcollector": "tsx scripts/create-collector-account.ts",
     "updateprogramconfig": " tsx scripts/update.ts",
+    "updatevault": " tsx scripts/update-vault.ts",
     "getprogramconfig": "tsx scripts/get-program-config.ts",
     "gettokenamount": "tsx scripts/get-token-amount.ts",
     "getdatafeed": "tsx scripts/get-data-feed.ts",
